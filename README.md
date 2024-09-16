@@ -2,7 +2,7 @@
 
 ---
 
-![badge](https://img.shields.io/badge/Language-Python-green)![badge](https://img.shields.io/badge/ARA_MINI-Software-blue) ![badge](https://img.shields.io/badge/Release-v1-white)
+![badge](https://img.shields.io/badge/Language-Python-green) ![badge](https://img.shields.io/badge/ARA_MINI-Software-blue) ![badge](https://img.shields.io/badge/Release-v1-white)
 
 ## Описание
 
