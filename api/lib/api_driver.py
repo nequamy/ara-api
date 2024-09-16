@@ -863,29 +863,9 @@ class MultirotorControl:
         else:
             return 1
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        if not self.transmitter.serial_client.closed:
-            self.transmitter.serial_client.close()
-
-    # def __enter__(self):
-    #
-    #     self.is_transmitter_open = self.connect()
-    #
-    #     if self.is_transmitter_open is True:
-    #         return self
-    #
-    #     else:
-    #         return 1
-    #
-    #
-    # def __exit__(self, *args, **kwargs):
-    #     # print(args)
-    #     # print(kwargs)
-    #
-    #     if self.transmitter.is_connect is True:
-    #         self.transmitter.disconnect()
-    #
-    #         logging.info("Transmitter is closed")
+    # def __exit__(self, exc_type, exc_value, traceback):
+    #     if not self.transmitter.serial_client.closed:
+    #         self.transmitter.serial_client.close()
 
     def connect(self, trials=100, delay=1) -> bool:
 
