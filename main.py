@@ -1,8 +1,10 @@
-from api.api import api
+from app import Api
 
 
 def main():
-    pass # method is empty
+    api = Api("192.168.2.1", 5760)
+    
+    api.update_loop()
 
 if __name__ == "__main__":
-    main() 
+    main()

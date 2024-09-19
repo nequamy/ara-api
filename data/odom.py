@@ -1,5 +1,5 @@
-from vector import Vector
-from quaternion import Quaternion
+from data.vector import Vector
+from data.quaternion import Quaternion
 
 
 class Odometry:

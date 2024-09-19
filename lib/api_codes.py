@@ -159,6 +159,8 @@ MSPCodes = {
         'MSP_SET_BOARD_INFO':             248, # Not used
         'MSP_SET_SIGNATURE':              249, # Not used
 
+        'MSP_POS_EST':                    222,
+        
         'MSP_EEPROM_WRITE':               250,
         'MSP_DEBUGMSG':                   253, # Not used
         'MSP_DEBUG':                      254,
