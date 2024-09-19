@@ -1,0 +1,22 @@
+|____main.py
+|____.gitignore
+|____README.md
+|____ara_mini.log
+|____api
+| |____api.py
+| |____lib
+| | |____api_codes.py
+| | |____api_driver.py
+| | |____transmitter.py
+| | |____pid.py
+| |____data
+| | |____channels.py
+| | |____altitude.py
+| | |____attitude.py
+| | |____odom.py
+| | |____barometer.py
+| | |____battery.py
+| | |____flags.py
+| | |____quaternion.py
+| | |____vector.py
+| | |____imu.py
