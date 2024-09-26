@@ -1,3 +1,3 @@
 class Channels:
     def __init__(self):
-        self.channels = []*8
+        self.channels = [1500, 1500, 1500, 1000, 1000, 1000, 1000, 1000]
