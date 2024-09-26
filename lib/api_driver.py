@@ -923,8 +923,6 @@ class MultirotorControl:
                 dataHandler = self.receive_msg()
                 self.process_recv_data(dataHandler)
 
-        print(self.CONFIG)
-
     def fast_read_altitude(self):
     
         if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_ALTITUDE']):
@@ -941,7 +939,6 @@ class MultirotorControl:
             msg = self.receive_raw_msg(size = (6+data_length))[5:]
             converted_msg = struct.unpack('<%dh' % (len(msg)/2) , msg[:-1])
 
-            print(len(converted_msg))
             if len(converted_msg) > 0:
                 self.SENSOR_DATA['accelerometer'][0] = converted_msg[0]
                 self.SENSOR_DATA['accelerometer'][1] = converted_msg[1]
@@ -954,6 +951,7 @@ class MultirotorControl:
                 self.SENSOR_DATA['magnetometer'][0] = converted_msg[6]
                 self.SENSOR_DATA['magnetometer'][1] = converted_msg[7]
                 self.SENSOR_DATA['magnetometer'][2] = converted_msg[8]
+                
 
     def fast_read_status(self):
         if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_STATUS'], data=[]):
@@ -972,7 +970,6 @@ class MultirotorControl:
             self.SENSOR_DATA['kinematics'][0] = converted_msg[0] / 10.0 # x
             self.SENSOR_DATA['kinematics'][1] = converted_msg[1] / 10.0 # y
             self.SENSOR_DATA['kinematics'][2] = converted_msg[2] # z
-
     
     def fast_read_odom(self):
         if self.send_RAW_msg(222):
@@ -980,12 +977,12 @@ class MultirotorControl:
             msg = bytearray(self.receive_raw_msg(size = (6+data_lenght))[5:])
             converted_msg = struct.unpack('<%dh' % (len(msg)/2) , msg[:-1])
             try:
-                self.ODOMETRY['position'][0] = converted_msg[0] / 1000
-                self.ODOMETRY['position'][1] = converted_msg[2] / 1000
-                self.ODOMETRY['position'][2] = converted_msg[4] / 1000
-                self.ODOMETRY['velocity'][0] = converted_msg[6] / 1000
-                self.ODOMETRY['velocity'][1] = converted_msg[8] / 1000
-                self.ODOMETRY['velocity'][2] = converted_msg[10] / 1000
+                self.ODOMETRY['position'][0] = converted_msg[0] / 10_000
+                self.ODOMETRY['position'][1] = converted_msg[2] / 10_000
+                self.ODOMETRY['position'][2] = converted_msg[4] / 10_000
+                self.ODOMETRY['velocity'][2] = converted_msg[6] / 10_000
+                self.ODOMETRY['velocity'][0] = converted_msg[8] / 10_000
+                self.ODOMETRY['velocity'][1] = converted_msg[10] / 10_000
                 self.ODOMETRY['yaw'] = converted_msg[12] / 100
                 
                 return self.ODOMETRY
@@ -997,8 +994,6 @@ class MultirotorControl:
             data_lenght = 36
             msg = bytearray(self.receive_raw_msg(size = (6+data_lenght))[5:])
             converted_msg = struct.unpack('<%dh' % (len(msg)/2) , msg[:-1])
-            print(len(msg))
-            print(converted_msg)
 
     def fast_read_analog(self):
         pass
