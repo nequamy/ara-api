@@ -976,14 +976,15 @@ class MultirotorControl:
             data_lenght = 40
             msg = bytearray(self.receive_raw_msg(size = (6+data_lenght))[5:])
             converted_msg = struct.unpack('<%dh' % (len(msg)/2) , msg[:-1])
+            # print(converted_msg)
             try:
                 self.ODOMETRY['position'][0] = converted_msg[0] / 10_000
                 self.ODOMETRY['position'][1] = converted_msg[2] / 10_000
-                self.ODOMETRY['position'][2] = converted_msg[4] / 10_000
+                self.ODOMETRY['position'][2] = round(abs(converted_msg[4] / 30_000), 2)
                 self.ODOMETRY['velocity'][2] = converted_msg[6] / 10_000
                 self.ODOMETRY['velocity'][0] = converted_msg[8] / 10_000
                 self.ODOMETRY['velocity'][1] = converted_msg[10] / 10_000
-                self.ODOMETRY['yaw'] = converted_msg[12] / 100
+                self.ODOMETRY['yaw'] = converted_msg[12] / 10
                 
                 return self.ODOMETRY
             except:
@@ -1020,7 +1021,6 @@ class MultirotorControl:
         data = struct.pack('<%dH' % len(cmds), *cmds)
         
         if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_SET_RAW_RC'], data):
-
             _ = self.receive_raw_msg(size = 6)
 
     def receive_raw_msg(self, size, timeout = 10):
@@ -1392,7 +1392,7 @@ class MultirotorControl:
                 checksum = self._crc8_dvb_s2(checksum, bufView[si])
             bufView[-1] = checksum
 
-        res = self.transmitter.send(bufView, blocking,timeout)
+        res = self.transmitter.send(bufView, blocking, timeout)
 
         return res
 

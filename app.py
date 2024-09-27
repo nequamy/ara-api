@@ -60,7 +60,7 @@ class Api(object):
         self.Kp = 0.5
         self.Ki = 0.1
         
-        self.time_delay = 0.02
+        self.time_delay = 0.5
 
         
     def update_loop(self) -> None:
@@ -73,17 +73,17 @@ class Api(object):
 
     def update_data(self) -> None:
         self.update_imu()
-        # self.update_battery()
+        self.update_battery()
         self.update_attitude()
         self.update_rc_in()
         self.update_odometry()
-        time.sleep(0.05)
 
 
     def load_data(self) -> None:
         self.rc_out.channels[4] = (self.arm_state * 1000) + 1000
         self.rc_out.channels[5] = (self.nav_state * 500) + 1000
-        # print(self.rc_out.channels)
+        print(self.rc_out.channels)
+        # print(f"RC:\t{self.rc_out.channels[0:3]}\nOdom:\n\tX - \t{self.odom['position'][0]}\n\tY - \t{self.odom['position'][1]}\n\tZ - \t{self.odom['position'][2]}\n")
         self.cmd_send()
 
 
@@ -113,13 +113,13 @@ class Api(object):
             print("ERR: out of bounds altitude")
             self.reset_state()
             return False
-        
-        alt_expo = self.drone_planner.exponential_ramp(self.drone_planner.remap(altitude), self.time_delay)
+
+        alt_expo = self.drone_planner.exponential_ramp(self.drone_planner.remap(altitude))
         
         while not self.check_desired_alt(altitude):
             try:
                 time.sleep(self.time_delay)
-                self.rc_out.channels[3] = int(alt_expo[i])
+                self.rc_out.channels[2] = int(alt_expo[i])
                 if (i + 1) >= len(alt_expo):
                     continue
                 else:
@@ -133,7 +133,7 @@ class Api(object):
     def land(self, auto_disarm: int = 0) -> bool:
         try:
             i = 0
-            alt_expo = self.drone_planner.exponential_ramp(self.drone_planner.remap(self.odom['position'][2]), self.delay)[::-1]
+            alt_expo = self.drone_planner.exponential_ramp(self.drone_planner.remap(self.odom['position'][2]))[::-1]
             while self.check_desired_alt(0):
                 time.sleep(self.time_delay)
                 self.rc_out.channels[3] = int(alt_expo[i])
@@ -167,10 +167,10 @@ class Api(object):
         while not self.drone_planner.check_desired_position():
             rc_buffer = self.drone_planner.compute(self.odom, self.attitude)
             
-            # self.rc_out.channels[0] = rc_buffer[0]
-            # self.rc_out.channels[1] = rc_buffer[1]
-            # self.rc_out.channels[2] = rc_buffer[2]
-            # self.rc_out.channels[3] = rc_buffer[3]
+            self.rc_out.channels[0] = int(rc_buffer[0])
+            self.rc_out.channels[1] = int(rc_buffer[1])
+            self.rc_out.channels[2] = 1400
+            self.rc_out.channels[3] = int(rc_buffer[3])
         
         if auto_land:
             self.land(auto_disarm=1)
@@ -229,7 +229,7 @@ class Api(object):
         self.altitude.relative = float(self.driver.SENSOR_DATA['sonar'])
         self.barometer.altitude = float(self.driver.SENSOR_DATA['sonar'])
         
-        # print(f"Altitude:\tBaro - \t{self.barometer.altitude}\tSonar - \t{self.altitude.relative}\tMonotonic - \t{self.altitude.monotonic}")
+        print(f"Altitude:\tBaro - \t{self.barometer.altitude}\tSonar - \t{self.altitude.relative}\tMonotonic - \t{self.altitude.monotonic}")
 
 
     def update_battery(self):
@@ -255,7 +255,7 @@ class Api(object):
         publish: eagle_eye_msgs/OpticalFlow
         """
         self.odom = self.driver.fast_read_odom()
-        # print(type(self.odom))
+        # print(self.odom)
         # print(f"Odom:\tX - \t{self.odom['position'][0]}\tY - \t{self.odom['position'][1]}\tZ - \t{self.odom['position'][2]}")
         
         
@@ -330,7 +330,7 @@ class Api(object):
         publish: eagle_eye_msgs/Channels
         """
         self.rc_out.channels[7] = 2000
-        # self.driver.fast_msp_rc_cmd(self.data)
+        self.driver.fast_msp_rc_cmd(self.rc_out.channels)
 
 
     @staticmethod
@@ -363,7 +363,7 @@ class Api(object):
         
         
     def check_desired_alt(self, altitude: float = 0) -> bool:
-        if altitude - 0.1 < self.odom['position'][2] < altitude + 0.1:
+        if altitude - 0.05 < self.odom['position'][2] < altitude + 0.05:
             return True
         else:
             return False
