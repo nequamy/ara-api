@@ -180,58 +180,25 @@ class Planner():
 
         return values
 
-    def neu_to_ecef(self, alt, neu_coords):
-        """
-        Преобразует координаты из системы NEU в ECEF.
+    def check_desired_xyzy(self):
+        return self.check_desired_yaw() and self.check_desired_altitude() and self.check_desired_position()
 
-        :param lat_deg: Широта точки старта в градусах
-        :param lon_deg: Долгота точки старта в градусах
-        :param alt: Высота точки старта в метрах
-        :param neu_coords: Координаты в системе NEU [North, East, Up]
-        :return: Координаты в системе ECEF
-        """
-        # Константы Земли
-        a = 6378137.0  # радиус Земли в экваториальной плоскости в метрах
-        e2 = 6.69437999014e-3  # квадрат эксцентриситета
+    def check_desired_yaw(self) -> bool:
+        if self.target_yaw - 0.1 < self.orient.body_rate.z < self.target_yaw + 0.1:
+            return True
+        else:
+            return False
 
-
-        # Конвертация градусов в радианы
-        lat_rad = np.radians(0)
-        lon_rad = np.radians(0)
-
-        # Вычисление параметров
-        N = a / np.sqrt(1 - e2 * (np.sin(lat_rad) ** 2))
-        X0 = (N + alt) * np.cos(lat_rad) * np.cos(lon_rad)
-        Y0 = (N + alt) * np.cos(lat_rad) * np.sin(lon_rad)
-        Z0 = ((1 - e2) * N + alt) * np.sin(lat_rad)
-
-        # Матрица преобразования из NEU в ECEF
-        neu_to_ecef_matrix = np.array([
-            [-np.sin(lat_rad) * np.cos(lon_rad), -np.sin(lon_rad), np.cos(lat_rad) * np.cos(lon_rad)],
-            [-np.sin(lat_rad) * np.sin(lon_rad), np.cos(lon_rad), np.cos(lat_rad) * np.sin(lon_rad)],
-            [np.cos(lat_rad), 0, np.sin(lat_rad)]
-        ])
-
-        # Перевод координат NEU в ECEF
-        neu_vector = np.array(neu_coords)
-        ecef_vector = np.dot(neu_to_ecef_matrix, neu_vector)
-
-        # Итоговые координаты ECEF
-        ecef_coords = np.array([X0, Y0, Z0]) + ecef_vector
-
-        return ecef_coords
+    def check_desired_altitude(self) -> bool:
+        if self.target_altitude - 0.1 < self.odom['position'][2] < self.target_altitude + 0.1:
+            return True
+        else:
+            return False
 
     def check_desired_position(self) -> bool:
 
         if (self.target_x - 0.5) < self.odom['position'][0] < (self.target_x + 0.5):
             if self.target_y - 0.5 < self.odom['position'][1] < self.target_y + 0.5:
-                # if self.target_altitude - 0.1 < self.odom['position'][2] < self.target_altitude + 0.1:
-                #     if self.target_yaw - 0.1 < self.orient.body_rate.z < self.target_yaw + 0.1:
-                #         return True
-                #     else:
-                #         return False
-                # else:
-                #     return False
                 return True
             else:
                 return False
