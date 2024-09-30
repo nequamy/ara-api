@@ -10,9 +10,10 @@ import time
 
 class Planner():
     def __init__(self, drone: Drone):
-        self.roll_pid = PID(kp=0.5, kd=0.2)
-        self.pitch_pid = PID(kp=0.5, kd=0.2)
-        self.yaw_pid = PID(kp=1, kd=0.5)
+        self.alt_expo = [0]
+        self.roll_pid = PID(kp=2.5, kd=1.5)
+        self.pitch_pid = PID(kp=2.5, kd=1.5)
+        self.yaw_pid = PID(kp=3, kd=1)
 
         self.drone = drone
 
@@ -23,7 +24,7 @@ class Planner():
 
         self.roll = 0
         self.pitch = 0
-        self.throttle = 0
+        self.throttle = 1000
         self.yaw = 0
 
         self.odom = {
@@ -34,16 +35,9 @@ class Planner():
 
         self.rc_channels = 0
 
-        self.kp_pos_x = 0.3
-        self.kp_pos_y = 0.25
-        self.kp_pos_ang_z = 0.1
-        self.kp_vel_x = 1.1
-        self.kp_vel_y = 1.1
-        self.kp_vel_ang_z = 0.05
-
-        self.roll_corrected = 0
-        self.pitch_corrected = 0
-        self.yaw_corrected = 0
+        self.roll_corrected = 1500
+        self.pitch_corrected = 1500
+        self.yaw_corrected = 1500
 
         self.approx_koef = 0.2
 
@@ -52,17 +46,19 @@ class Planner():
 
         self.orient = 0
 
-        self.time_delay = 5
+        self.time_delay = 0.4
 
         self.g = 9.80665
 
     def compute(self, odom, att):
         self.odom = odom
-        self.odom['yaw'] = radians(self.odom['yaw'])
         self.orient = att
 
         self.compute_xy()
         self.compute_yaw()
+
+        # self.pitch = 1
+        # self.roll = 0
 
         self.transform_speed_to_local()
 
@@ -70,80 +66,111 @@ class Planner():
 
         # self.throttle = self.compute_throttle()
 
-        feedback = [self.remap_by_max_min(self.roll, 1000, 2000, 1300, 1700),
-                    self.remap_by_max_min(self.pitch, 1000, 2000, 1300, 1700),
-                    self.throttle,
-                    1500]
-                    # self.remap_by_max_min(self.yaw, 1000, 2000, 1300, 1700)]
-
-        # print(feedback)
-
-        return feedback
+        self.roll_corrected = 1500 + int(self.remap_by_max_min(self.roll, -2, 2, -300, 300))
+        self.pitch_corrected = 1500 + int(self.remap_by_max_min(self.pitch, -2, 2, -300, 300))
+        self.yaw_corrected = 1500 + int(self.remap_by_max_min(self.yaw, -2, 2, -300, 300))
 
     def compute_xy(self):
-        self.pitch = self.pitch_pid.compute(self.target_y, self.odom['position'][0])
-        self.roll = self.roll_pid.compute(self.target_x, self.odom['position'][1])
+        self.pitch = self.pitch_pid.compute(self.target_x, self.odom['position'][0])
+        self.roll = self.roll_pid.compute(self.target_y, self.odom['position'][1])
 
     def compute_yaw(self):
+        # print(f"yaw:\t{self.odom['yaw']}, \ttarget:\t{self.target_yaw}")
         self.yaw = self.yaw_pid.compute(self.target_yaw, self.odom['yaw'])
+        self.yaw = self.constrain(self.yaw, -2, 2)
+        # print(f"yaw velocity:\t{self.yaw}")
 
-    def set_point_rel(self, x, y, altitude, yaw):
-        self.target_x += x
-        self.target_y += y
-        self.target_altitude += altitude
-        self.target_yaw += radians(yaw)
-        self.target_yaw = self.normalize_yaw_radians(self.target_yaw)
+    def takeoff(self):
+        i = 0
+        self.alt_expo = self.exponential_ramp(self.remap(self.target_altitude))
 
-    def set_point_abs(self, x, y, altitude, yaw):
-        self.target_x = x
-        self.target_y = y
-        self.target_altitude = altitude
-        self.target_yaw = radians(yaw)
-        self.target_yaw = self.normalize_yaw_radians(self.target_yaw)
+        while not self.check_desired_altitude():
+            try:
+                time.sleep(self.time_delay)
+                self.throttle = int(self.alt_expo[i])
+                if (i + 1) >= len(self.alt_expo):
+                    continue
+                else:
+                    i += 1
+            except Exception as err:
+                print("ERR:" + str(err))
+                return False
+
+        return True
+
+    def land(self):
+        i = 0
+        alt_expo = self.exponential_ramp(self.throttle)[::-1]
+        while self.check_desired_altitude(0):
+            try:
+                time.sleep(self.time_delay)
+                self.throttle = int(alt_expo[i])
+                if (i + 1) >= len(alt_expo):
+                    continue
+                else:
+                    i += 1
+            except Exception as err:
+                print("ERR: land error" + str(err))
+                return False
+
+        return True
+
+    def set_point(self, x: int | float = None, y: int | float = None,
+                      altitude: int | float = None, yaw: int | float = None):
+        if x is not None:
+            self.target_x = x
+        if y is not None:
+            self.target_y = y
+        if altitude is not None:
+            self.target_altitude = altitude
+        if yaw is not None:
+            self.target_yaw = radians(yaw)
+            self.target_yaw = self.normalize_radians(self.target_yaw)
+
+    def set_attitude(self, attitude):
+        self.orient = attitude
 
     def transform_speed_to_local(self):
-        roll_rad = self.orient.body_rate.x
-        pitch_rad = self.orient.body_rate.y
-        yaw_rad = self.orient.body_rate.z
+        roll_rad = self.normalize_radians(self.orient.body_rate.y)
+        pitch_rad = self.normalize_radians(self.orient.body_rate.x)
+        yaw_rad = self.normalize_radians(self.orient.body_rate.z)
 
         # print(f"Roll:\t{roll_rad}\nPitch:\t{pitch_rad}\nYaw:\t{yaw_rad}")
+        syaw = sin(yaw_rad)
+        cyaw = cos(yaw_rad)
+
+        spitch = sin(pitch_rad)
+        cpitch = cos(pitch_rad)
+
+        sroll = sin(roll_rad)
+        croll = cos(roll_rad)
 
         r_matrix = np.array([
             [
-                np.cos(yaw_rad) * np.cos(pitch_rad),
-                np.cos(yaw_rad) * np.sin(pitch_rad) * np.sin(roll_rad) - np.sin(yaw_rad) * np.cos(roll_rad),
-                np.cos(yaw_rad) * np.sin(pitch_rad) * np.cos(roll_rad) + np.sin(yaw_rad) * np.sin(roll_rad)
+                cyaw * cpitch,
+                cyaw * spitch * sroll - syaw * croll,
+                cyaw * spitch * croll + syaw * sroll
             ],
             [
-                np.sin(yaw_rad) * np.cos(pitch_rad),
-                np.sin(yaw_rad) * np.sin(pitch_rad) * np.sin(roll_rad) + np.cos(yaw_rad) * np.cos(roll_rad),
-                np.sin(yaw_rad) * np.sin(pitch_rad) * np.cos(roll_rad) - np.cos(yaw_rad) * np.sin(roll_rad)
+                syaw * cpitch,
+                syaw * spitch * sroll + cyaw * croll,
+                syaw * spitch * croll - cyaw * sroll
             ],
             [
-                -np.sin(pitch_rad),
-                np.cos(pitch_rad) * np.sin(roll_rad),
-                np.cos(pitch_rad) * np.cos(roll_rad)
+                -spitch,
+                cpitch * sroll,
+                cpitch * croll
             ]
         ])
 
         r_transposed = np.transpose(r_matrix)
 
-        v_local = np.dot(r_transposed, np.array([self.roll, self.pitch, self.yaw]))
-        self.roll = self.speed_to_rc_channel(v_local[0])
-        self.pitch = self.speed_to_rc_channel(v_local[1])
-        self.yaw = self.speed_to_rc_channel(v_local[2])
-        # self.rc_channels = np.array([self.speed_to_rc_channel(v_local[0]),
-        #                         self.speed_to_rc_channel(v_local[1]),
-        #                         1500], dtype=np.int32)
-        # self.speed_to_rc_channel(v_local[2])], dtype=np.int32)
+        v_local = r_transposed @ np.array([self.roll, self.pitch, self.yaw])
 
-        # print(self.rc_channels)
+        self.roll = self.constrain(v_local[0], -2, 2)
+        self.pitch = self.constrain(v_local[1], -2, 2)
 
-    def speed_to_rc_channel(self, speed, channel_center=1500, channel_range=500):
-        pid_output = np.clip(speed, -1, 1) * channel_range
-        return channel_center + pid_output
-
-    def normalize_yaw_radians(self, yaw):
+    def normalize_radians(self, angle):
         """
         Нормализует угол по yaw в радианах в диапазоне от 0 до 2π радиан.
         
@@ -153,7 +180,7 @@ class Planner():
         Returns:
         float: Нормализованный угол по yaw в диапазоне от 0 до 2π радиан.
         """
-        normalized_yaw = (yaw + 2 * np.pi) % (2 * np.pi)
+        normalized_yaw = (angle + 2 * np.pi) % (2 * np.pi)
 
         return normalized_yaw
 
@@ -181,7 +208,9 @@ class Planner():
         return values
 
     def check_desired_xyzy(self):
-        return self.check_desired_yaw() and self.check_desired_altitude() and self.check_desired_position()
+        # print(f"YAW: \t{self.check_desired_yaw()}")
+        # print(f"POS: \t{self.check_desired_position()}\n")
+        return self.check_desired_yaw() and self.check_desired_position()
 
     def check_desired_yaw(self) -> bool:
         if self.target_yaw - 0.1 < self.orient.body_rate.z < self.target_yaw + 0.1:
@@ -189,16 +218,20 @@ class Planner():
         else:
             return False
 
-    def check_desired_altitude(self) -> bool:
-        if self.target_altitude - 0.1 < self.odom['position'][2] < self.target_altitude + 0.1:
+    def check_desired_altitude(self, alt: int = None) -> bool:
+        if alt is None:
+            check_alt = self.alt_expo[len(self.alt_expo) - 1]
+        else:
+            check_alt = 1000 + 500 * alt
+
+        if self.throttle == check_alt:
             return True
         else:
             return False
 
     def check_desired_position(self) -> bool:
-
-        if (self.target_x - 0.5) < self.odom['position'][0] < (self.target_x + 0.5):
-            if self.target_y - 0.5 < self.odom['position'][1] < self.target_y + 0.5:
+        if (self.target_x - 0.12) < self.odom['position'][0] < (self.target_x + 0.12):
+            if self.target_y - 0.12 < self.odom['position'][1] < self.target_y + 0.12:
                 return True
             else:
                 return False
@@ -211,3 +244,6 @@ class Planner():
 
     def remap_by_max_min(self, x, min_old, max_old, min_new, max_new):
         return (x - min_old) * (max_new - min_new) / (max_old - min_old) + min_new
+
+    def constrain(self, val, min_val, max_val):
+        return min(max_val, max(min_val, val))

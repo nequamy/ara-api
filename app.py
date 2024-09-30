@@ -4,11 +4,14 @@ from lib.drone import Drone
 from lib.planner import Planner
 from lib.pid import PID
 
-# import pandas as pd
 import numpy as np
 from math import atan2, sqrt, radians
 from threading import Thread
 import time
+
+import colorama
+from colorama import Fore
+import pyfiglet
 
 from data.altitude import Altitude
 from data.attitude import Attitude
@@ -22,6 +25,24 @@ from data.imu import Imu
 
 class Api(object):
     def __init__(self, ip: str, port: int, drone: Drone):
+
+        colorama.init()
+
+        ascii_art = pyfiglet.figlet_format("ARA MINI API v1", font="slant", width=50)
+        summary = ("Поздравляем! Вы запустили API для программирования ARA MINI\n\n"
+                   "Для подключения в конфигуратеоре:\n"
+                   "\tUDP: \thttp://192.168.2.1:14550\n"
+                   "\tTCP: \thttp://192.168.2.1:5760\n\n"
+                   "Документация по методам: \t\thttp://localhost:8080/docs\n"
+                   "WEB-интерфейс для управления: \thttp://localhost:8080/web\n")
+        print(Fore.BLUE + ascii_art)
+        print("=" * 60)
+        print(Fore.CYAN + summary)
+
+        print(Fore.RED + "Data output:")
+        print(Fore.MAGENTA)
+        colorama.deinit()
+
         self.connector = TCPTransmitter((ip, port))
         self.driver = MultirotorControl(self.connector)
         self.driver.connect()
@@ -36,7 +57,16 @@ class Api(object):
         self.channels = Channels()
         self.rc_out = Channels()
         self.flags = Flags()
-        self.odom = Odometry()
+        self.odom = {
+            'position':                   [0, 0, 0],
+            'velocity':                   [0, 0, 0],
+            'yaw':                         0,
+        }
+        self.odom_zero = {
+            'position':                   [0, 0, 0],
+            'velocity':                   [0, 0, 0],
+            'yaw':                         0,
+        }
         self.imu = Imu()
 
         self.is_armed = False
@@ -52,6 +82,16 @@ class Api(object):
         self.roll = 0
         self.pitch = 0
         self.yaw = 0
+
+        self.ang_x = 0
+        self.ang_y = 0
+        self.ang_z = 0
+        self.ang_x_zero = 0
+        self.ang_y_zero = 0
+        self.ang_z_zero = 0
+
+        self.odom_zero_flag = True
+        self.att_zero_flag = True
 
         self.alt_pid = PID(5, 3, 3)
 
@@ -71,16 +111,21 @@ class Api(object):
 
     def update_data(self) -> None:
         self.update_imu()
-        self.update_battery()
+        # self.update_battery()
         self.update_attitude()
         self.update_rc_in()
         self.update_odometry()
 
     def load_data(self) -> None:
+        self.rc_out.channels[0] = self.drone_planner.roll_corrected
+        self.rc_out.channels[1] = self.drone_planner.pitch_corrected
+        self.rc_out.channels[2] = 1400
+        self.rc_out.channels[3] = self.drone_planner.yaw_corrected
         self.rc_out.channels[4] = (self.arm_state * 1000) + 1000
         self.rc_out.channels[5] = (self.nav_state * 500) + 1000
-        print(self.rc_out.channels)
-        # print(f"RC:\t{self.rc_out.channels[0:3]}\nOdom:\n\tX - \t{self.odom['position'][0]}\n\tY - \t{self.odom['position'][1]}\n\tZ - \t{self.odom['position'][2]}\n")
+        # print(self.rc_out.channels)
+        print(f"RC:\t{self.rc_out.channels[0:4]}\nOdom:\n\tX - \t{self.odom['position'][0]}\n\tY - \t{self.odom['position'][1]}\n\tZ - \t{self.odom['position'][2]}\n"
+              f"Angle X:\t{self.attitude.body_rate.x}\nAngle Y:\t{self.attitude.body_rate.y}\nAngle Z:\t{self.attitude.body_rate.z}\n")
         self.cmd_send()
 
     def set_arm_state(self, state: bool = 0) -> bool:
@@ -96,8 +141,6 @@ class Api(object):
         return True
 
     def takeoff(self, altitude: int = None) -> bool:
-        i = 0
-
         if altitude is None:
             print("ERR: set altitude for takeoff method")
             self.reset_state()
@@ -108,61 +151,42 @@ class Api(object):
             self.reset_state()
             return False
 
-        alt_expo = self.drone_planner.exponential_ramp(self.drone_planner.remap(altitude))
+        self.drone_planner.set_point(altitude=altitude)
 
-        while not self.check_desired_alt(altitude):
-            try:
-                time.sleep(self.time_delay)
-                self.rc_out.channels[2] = int(alt_expo[i])
-                if (i + 1) >= len(alt_expo):
-                    continue
-                else:
-                    i += 1
-            except Exception as err:
-                print("ERR:" + str(err))
-                self.reset_state()
-                return False
-
-    def land(self, auto_disarm: int = 0) -> bool:
-        try:
-            i = 0
-            alt_expo = self.drone_planner.exponential_ramp(self.drone_planner.remap(self.odom['position'][2]))[::-1]
-            while self.check_desired_alt(0):
-                time.sleep(self.time_delay)
-                self.rc_out.channels[3] = int(alt_expo[i])
-                if (i + 1) >= len(alt_expo):
-                    continue
-                else:
-                    i += 1
-        except Exception as err:
-            print("ERR: land error")
+        if self.drone_planner.takeoff():
+            return True
+        else:
             self.reset_state()
             return False
 
-        if auto_disarm == 1:
-            self.arm_state = 0
+    def land(self, auto_disarm: int = 0) -> bool:
+        self.drone_planner.set_point(altitude=0)
 
-        return True
+        if self.drone_planner.land():
+            return True
+        else:
+            self.reset_state()
+            return False
 
     def navigate(self, x: float = None, y: float = None,
                  z: float = None, yaw: int = None,
                  auto_land: bool = False, mode: str = "ABS") -> bool:
 
         if mode == "ABS":
-            self.drone_planner.set_point_abs(x=x, y=y, altitude=z, yaw=yaw)
-        elif mode == "REL":
-            self.drone_planner.set_point_rel(x=x, y=y, altitude=z, yaw=yaw)
+            self.drone_planner.set_point(x=x, y=y, altitude=z, yaw=yaw)
         else:
             print("ERR: go to huy")
             return False
 
-        while not self.drone_planner.check_desired_position():
-            rc_buffer = self.drone_planner.compute(self.odom, self.attitude)
+        self.drone_planner.set_attitude(self.attitude)
 
-            self.rc_out.channels[0] = int(rc_buffer[0])
-            self.rc_out.channels[1] = int(rc_buffer[1])
-            self.rc_out.channels[2] = 1400
-            self.rc_out.channels[3] = int(rc_buffer[3])
+        while not self.drone_planner.check_desired_xyzy():
+            self.drone_planner.compute(self.odom, self.attitude)
+
+        self.drone_planner.roll_corrected = 1500
+        self.drone_planner.pitch_corrected = 1500
+
+        time.sleep(5)
 
         if auto_land:
             self.land(auto_disarm=1)
@@ -222,29 +246,39 @@ class Api(object):
         print(
             f"Altitude:\tBaro - \t{self.barometer.altitude}\tSonar - \t{self.altitude.relative}\tMonotonic - \t{self.altitude.monotonic}")
 
-    def update_battery(self):
-        """
-        Function for publishing system voltage from FC
-
-        publish: eagle_eye_msgs/Battery
-        """
-        self.driver.fast_read_analog()
-        # self.battery.voltage = round(self.driver.ANALOG['voltage'], 2)
-        # self.battery.amperage = round(self.driver.ANALOG['amperage'], 2)
-        # self.battery.mah = float(self.driver.ANALOG['mAhdrawn'])
-        # self.battery.count_of_cells = f"{int(self.driver.ANALOG['voltage'] / 3.7)}s"
-        # self.battery.percent_of_voltage = int(self.battery.voltage / (4.2 * self.driver.ANALOG['voltage'] / 3.7) * 100)
+    # def update_battery(self):
+    #     """
+    #     Function for publishing system voltage from FC
+    #
+    #     publish: eagle_eye_msgs/Battery
+    #     """
+    #     self.driver.fast_read_analog()
+    #     # self.battery.voltage = round(self.driver.ANALOG['voltage'], 2)
+    #     # self.battery.amperage = round(self.driver.ANALOG['amperage'], 2)
+    #     # self.battery.mah = float(self.driver.ANALOG['mAhdrawn'])
+    #     # self.battery.count_of_cells = f"{int(self.driver.ANALOG['voltage'] / 3.7)}s"
+    #     # self.battery.percent_of_voltage = int(self.battery.voltage / (4.2 * self.driver.ANALOG['voltage'] / 3.7) * 100)
 
     def update_odometry(self):
         """
         Function for publishing optical flow values.
-        
-        
 
         publish: eagle_eye_msgs/OpticalFlow
         """
         self.odom = self.driver.fast_read_odom()
-        # print(self.odom)
+
+        if self.odom_zero_flag:
+            self.odom_zero['position'][0] = self.odom['position'][0]
+            self.odom_zero['position'][1] = self.odom['position'][1]
+            self.odom_zero['position'][2] = self.odom['position'][2]
+            self.odom_zero['yaw'] = self.odom['yaw']
+            self.odom_zero_flag = False
+
+        self.odom['position'][0] = -round(self.odom['position'][0] - self.odom_zero['position'][0], 2)
+        self.odom['position'][1] = round(self.odom['position'][1] - self.odom_zero['position'][1], 2)
+        self.odom['position'][2] = round(self.odom['position'][2] - self.odom_zero['position'][2], 2)
+        self.odom['yaw'] = self.odom['yaw'] - self.odom_zero['yaw']
+
         # print(f"Odom:\tX - \t{self.odom['position'][0]}\tY - \t{self.odom['position'][1]}\tZ - \t{self.odom['position'][2]}")
 
     def update_attitude(self):
@@ -256,11 +290,15 @@ class Api(object):
         """
         self.driver.fast_read_attitude()
 
-        self.ang_x = radians(self.driver.SENSOR_DATA['kinematics'][0])
-        self.ang_y = radians(self.driver.SENSOR_DATA['kinematics'][1])
-        self.ang_z = radians(self.driver.SENSOR_DATA['kinematics'][2])
+        if self.att_zero_flag:
+            self.ang_x_zero = radians(self.driver.SENSOR_DATA['kinematics'][0])
+            self.ang_y_zero = radians(self.driver.SENSOR_DATA['kinematics'][1])
+            self.ang_z_zero = radians(self.driver.SENSOR_DATA['kinematics'][2])
+            self.att_zero_flag = False
 
-        # print(f"Attitude:\tX - \t{self.ang_x}\tY - \t{self.ang_y}\tZ - \t{self.ang_z}")
+        self.ang_x = radians(self.driver.SENSOR_DATA['kinematics'][0]) - self.ang_x_zero
+        self.ang_y = radians(self.driver.SENSOR_DATA['kinematics'][1]) - self.ang_y_zero
+        self.ang_z = radians(self.driver.SENSOR_DATA['kinematics'][2]) - self.ang_z_zero
 
         self.attitude.body_rate.x = self.ang_x
         self.attitude.body_rate.y = self.ang_y

@@ -28,10 +28,10 @@ class PID(object):
         self.curr_time = time.time() if self.curr_time == None else self.curr_time
         self.err = setpoint - value
         
-        self.dt = ((self.curr_time - self.prev_time)) if (self.curr_time - self.prev_time) > 0 else 0.1
+        self.dt = (self.curr_time - self.prev_time) if (self.curr_time - self.prev_time) > 0 else 0.1
         
         self.p_term = self.err * self.kp
-        # self.i_term += self.err * self.dt
+        self.i_term += self.err * self.dt
         self.d_term = (self.err - self.prev_err) / (self.dt * 1000)
         self.prev_time = self.curr_time
         self.curr_time = time.time()

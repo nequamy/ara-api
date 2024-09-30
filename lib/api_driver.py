@@ -3,6 +3,7 @@ import struct
 
 import time
 import sys
+from math import radians
 
 from threading import Lock
 
@@ -973,19 +974,21 @@ class MultirotorControl:
     
     def fast_read_odom(self):
         if self.send_RAW_msg(222):
-            data_lenght = 40
-            msg = bytearray(self.receive_raw_msg(size = (6+data_lenght))[5:])
-            converted_msg = struct.unpack('<%dh' % (len(msg)/2) , msg[:-1])
+            data_lenght = 32
+            msg = bytearray(self.receive_raw_msg(size=(6+data_lenght))[5:])
+            converted_msg = struct.unpack('<7i', msg[:28])
             # print(converted_msg)
             try:
-                self.ODOMETRY['position'][0] = converted_msg[0] / 10_000
-                self.ODOMETRY['position'][1] = converted_msg[2] / 10_000
-                self.ODOMETRY['position'][2] = round(abs(converted_msg[4] / 30_000), 2)
-                self.ODOMETRY['velocity'][2] = converted_msg[6] / 10_000
-                self.ODOMETRY['velocity'][0] = converted_msg[8] / 10_000
-                self.ODOMETRY['velocity'][1] = converted_msg[10] / 10_000
-                self.ODOMETRY['yaw'] = converted_msg[12] / 10
-                
+                self.ODOMETRY['position'][0] = -(converted_msg[0] / 100_000)
+                self.ODOMETRY['position'][1] = (converted_msg[1] / 100_000)
+                self.ODOMETRY['position'][2] = (converted_msg[2] / 100_000)
+                self.ODOMETRY['velocity'][2] = (converted_msg[3] / 100_000)
+                self.ODOMETRY['velocity'][0] = -(converted_msg[4] / 100_000)
+                self.ODOMETRY['velocity'][1] = (converted_msg[5] / 100_000)
+                self.ODOMETRY['yaw'] = radians(converted_msg[6] / 10)
+
+                # print(self.ODOMETRY)
+
                 return self.ODOMETRY
             except:
                 pass
@@ -1025,7 +1028,7 @@ class MultirotorControl:
 
     def receive_raw_msg(self, size, timeout = 10):
 
-        msg_header, msg =  self.transmitter.receive(size,timeout)
+        msg_header, msg =  self.transmitter.receive(size, timeout)
 
         return msg_header + msg
 
