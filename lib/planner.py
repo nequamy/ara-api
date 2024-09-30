@@ -57,14 +57,7 @@ class Planner():
         self.compute_xy()
         self.compute_yaw()
 
-        # self.pitch = 1
-        # self.roll = 0
-
         self.transform_speed_to_local()
-
-        # print(self.roll, self.pitch, self.yaw)
-
-        # self.throttle = self.compute_throttle()
 
         self.roll_corrected = 1500 + int(self.remap_by_max_min(self.roll, -2, 2, -300, 300))
         self.pitch_corrected = 1500 + int(self.remap_by_max_min(self.pitch, -2, 2, -300, 300))
@@ -75,10 +68,8 @@ class Planner():
         self.roll = self.roll_pid.compute(self.target_y, self.odom['position'][1])
 
     def compute_yaw(self):
-        # print(f"yaw:\t{self.odom['yaw']}, \ttarget:\t{self.target_yaw}")
         self.yaw = self.yaw_pid.compute(self.target_yaw, self.odom['yaw'])
         self.yaw = self.constrain(self.yaw, -2, 2)
-        # print(f"yaw velocity:\t{self.yaw}")
 
     def takeoff(self):
         i = 0
@@ -127,6 +118,24 @@ class Planner():
             self.target_yaw = radians(yaw)
             self.target_yaw = self.normalize_radians(self.target_yaw)
 
+    def set_throttle(self, throttle: int | float = None):
+        if throttle < 1000:
+            print("ERR: throttle so low")
+            return False
+
+        self.throttle = throttle
+
+    def set_attitude(self, att):
+        self.orient = att
+
+    def set_vel_x(self, x: int | float = None):
+        self.pitch = x
+        print(self.pitch)
+
+    def set_vel_y(self, y: int | float = None):
+        self.roll = y
+        self.transform_speed_to_local()
+
     def set_attitude(self, attitude):
         self.orient = attitude
 
@@ -171,31 +180,11 @@ class Planner():
         self.pitch = self.constrain(v_local[1], -2, 2)
 
     def normalize_radians(self, angle):
-        """
-        Нормализует угол по yaw в радианах в диапазоне от 0 до 2π радиан.
-        
-        Args:
-        yaw (float): Угол по yaw в радианах.
-        
-        Returns:
-        float: Нормализованный угол по yaw в диапазоне от 0 до 2π радиан.
-        """
         normalized_yaw = (angle + 2 * np.pi) % (2 * np.pi)
 
         return normalized_yaw
 
     def exponential_ramp(self, target_value: float = 0):
-        """
-        Создает массив чисел, плавно увеличивающихся от минимального значения до целевого значения по экспоненциальной кривой,
-        но не превышающих максимальное значение.
-        
-        Args:
-        target_value (float): Целевое значение.
-        num_steps (int): Количество шагов для вычисления массива.
-        
-        Returns:
-        numpy.ndarray: Массив значений.
-        """
         target_value = min(target_value, self.upper_threshold)
 
         num_steps = (target_value / 200) * e
@@ -207,9 +196,7 @@ class Planner():
 
         return values
 
-    def check_desired_xyzy(self):
-        # print(f"YAW: \t{self.check_desired_yaw()}")
-        # print(f"POS: \t{self.check_desired_position()}\n")
+    def check_desired_xyy(self):
         return self.check_desired_yaw() and self.check_desired_position()
 
     def check_desired_yaw(self) -> bool:
