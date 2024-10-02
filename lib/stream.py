@@ -3,10 +3,11 @@ import numpy as np
 
 
 class Stream(object):
-    def __init__(self):
+    def __init__(self, mode: str = None):
         self.cap = None
         self.ids = None
         self.url = "http://192.168.2.113:81/stream"
+        self.mode = mode
 
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
         self.parameters = cv2.aruco.DetectorParameters()
@@ -27,9 +28,11 @@ class Stream(object):
 
             corners, self.ids, rejectedImgPoints = cv2.aruco.detectMarkers(gray, self.aruco_dict,
                                                                            parameters=self.parameters)
-
+        
+            
         self.cap.release()
         cv2.destroyAllWindows()
 
     def get_id(self):
         return self.ids
+
