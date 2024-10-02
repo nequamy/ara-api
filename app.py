@@ -116,11 +116,12 @@ class Api(object):
         self.rc_out.channels[0] = self.drone_planner.roll_corrected
         self.rc_out.channels[1] = self.drone_planner.pitch_corrected
         self.rc_out.channels[2] = self.drone_planner.throttle
-        self.rc_out.channels[3] = self.drone_planner.yaw_corrected
+        self.rc_out.channels[3] = 1500
         self.rc_out.channels[4] = (self.arm_state * 1000) + 1000
-        self.rc_out.channels[5] = (self.nav_state * 500) + 1000
+        self.rc_out.channels[6] = (self.nav_state * 500) + 1000
 
-        print(self.rc_out.channels)
+        print(f"RC:\t{self.rc_out.channels[0:8]}\nOdom:\n\tX - \t{self.odom['position'][0]}\n\tY - \t{self.odom['position'][1]}\n\tZ - \t{self.odom['position'][2]}\n"
+              f"Angle X:\t{self.attitude.body_rate.x}\nAngle Y:\t{self.attitude.body_rate.y}\nAngle Z:\t{self.attitude.body_rate.z}\n")
 
         self.cmd_send()
 
@@ -176,7 +177,7 @@ class Api(object):
 
     def go_to_xy(self, x: float = None, y: float = None,
                  auto_land: bool = False) -> bool:
-
+        self.drone_planner.set_point(x=x, y=y)
         self.drone_planner.set_attitude(self.attitude)
 
         while not self.drone_planner.check_desired_position():

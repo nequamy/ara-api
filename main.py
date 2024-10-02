@@ -9,7 +9,7 @@ import time
 Список методов API:
 
 api.set_arm_state(state) - принимает на вход True или False для ARM и DISARM соответственно.
-api.set_arm_state(state) - принимает на вход 0, 1 и 2 для ANGLE, ALTHOLD и POSHOLD соответственно.
+api.set_nav_state(state) - принимает на вход 0, 1 и 2 для ANGLE, ALTHOLD и POSHOLD соответственно.
 api.takeoff(altitude) - метод для подъема дрона на высоту, отправленную в аргументах функции.
 api.land(auto_disarm) - метод для опускания дрона. На вход ожидает True или False для автоматического
                         отключения двигателей.
@@ -47,10 +47,6 @@ def main():
     ######## Начало кода ########
 
     # Пример
-
-    # api.takeoff(1.5)
-
-    # api.set_velocity_x(1)
 
     print(api.go_to_xy(1, 1))
 

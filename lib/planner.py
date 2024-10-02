@@ -74,7 +74,7 @@ class Planner():
     def takeoff(self):
         i = 0
         self.alt_expo = self.exponential_ramp(self.remap(self.target_altitude))
-
+        
         while not self.check_desired_altitude():
             try:
                 time.sleep(self.time_delay)
@@ -91,12 +91,13 @@ class Planner():
 
     def land(self):
         i = 0
-        alt_expo = self.exponential_ramp(self.throttle)[::-1]
-        while self.check_desired_altitude(0):
+        self.alt_expo = self.exponential_ramp(self.throttle)[::-1]
+        
+        while not self.check_desired_altitude():
             try:
                 time.sleep(self.time_delay)
-                self.throttle = int(alt_expo[i])
-                if (i + 1) >= len(alt_expo):
+                self.throttle = int(self.alt_expo[i])
+                if (i + 1) >= len(self.alt_expo):
                     continue
                 else:
                     i += 1
@@ -124,17 +125,15 @@ class Planner():
             return False
 
         self.throttle = throttle
-
+    
     def set_attitude(self, att):
         self.orient = att
 
     def set_vel_x(self, x: int | float = None):
-        self.pitch = x
-        print(self.pitch)
+        self.pitch_corrected = 1500 + int(self.remap_by_max_min(x, -2, 2, -300, 300))
 
     def set_vel_y(self, y: int | float = None):
-        self.roll = y
-        self.transform_speed_to_local()
+        self.roll_corrected = 1500 + int(self.remap_by_max_min(y, -2, 2, -300, 300))
 
     def set_attitude(self, attitude):
         self.orient = attitude
