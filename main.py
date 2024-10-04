@@ -48,6 +48,14 @@ def main():
 
     # Пример
 
+    api.set_arm_state(1)
+    time.sleep(2)
+    api.set_nav_state(2)
+    time.sleep(2)
+    api.takeoff(1.5)
+    time.sleep(15)
+    api.land()
+
     print(api.go_to_xy(1, 1))
 
     # while not (stream.get_id() == 1):
@@ -64,6 +72,9 @@ def main():
 
     stream_thread.join()
     update_thread.join()
+
+    api.reset_state()
+    api.load_data()
 
 
 if __name__ == "__main__":

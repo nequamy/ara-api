@@ -100,7 +100,6 @@ class Api(object):
 
     def update_loop(self) -> None:
         while True:
-            # print(self.rc_out.channels)
             self.update_data()
 
             self.load_data()
@@ -332,7 +331,6 @@ class Api(object):
 
         publish: eagle_eye_msgs/Channels
         """
-        self.rc_out.channels[7] = 2000
         self.driver.fast_msp_rc_cmd(self.rc_out.channels)
 
     @staticmethod
