@@ -48,6 +48,11 @@ def main():
 
     # Пример
 
+    api.set_arm_state(1)
+    time.sleep(2)
+    api.set_nav_state(2)
+    time.sleep(2)
+    
     print(api.go_to_xy(1, 1))
 
     # while not (stream.get_id() == 1):
