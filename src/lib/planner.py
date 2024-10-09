@@ -2,6 +2,7 @@ import math
 
 from lib.pid import PID
 from lib.drone import Drone
+from data.attitude import Attitude
 
 import numpy as np
 from math import e, sin, cos, atan, pi, radians
@@ -13,7 +14,7 @@ class Planner():
         self.alt_expo = [0]
         self.roll_pid = PID(kp=2.5, kd=1.5)
         self.pitch_pid = PID(kp=2.5, kd=1.5)
-        self.yaw_pid = PID(kp=3, kd=1)
+        self.yaw_pid = PID(kp=3)
 
         self.drone = drone
 
@@ -44,17 +45,14 @@ class Planner():
         self.upper_threshold = 2000
         self.lower_threshold = 1000
 
-        self.orient = 0
+        self.orient = Attitude
 
         self.time_delay = 0.4
 
         self.g = 9.80665
 
-    def compute(self, odom, att):
-        self.odom = odom
-        self.orient = att
-
-        self.compute_xy()
+    def compute(self):
+        # self.compute_xy()
         self.compute_yaw()
 
         self.transform_speed_to_local()
@@ -62,13 +60,15 @@ class Planner():
         self.roll_corrected = 1500 + int(self.remap_by_max_min(self.roll, -2, 2, -300, 300))
         self.pitch_corrected = 1500 + int(self.remap_by_max_min(self.pitch, -2, 2, -300, 300))
         self.yaw_corrected = 1500 + int(self.remap_by_max_min(self.yaw, -2, 2, -300, 300))
+        print(self.orient.body_rate.z)
+        # print(self.yaw_corrected)
 
     def compute_xy(self):
         self.pitch = self.pitch_pid.compute(self.target_x, self.odom['position'][0])
         self.roll = self.roll_pid.compute(self.target_y, self.odom['position'][1])
 
     def compute_yaw(self):
-        self.yaw = self.yaw_pid.compute(self.target_yaw, self.odom['yaw'])
+        self.yaw = self.yaw_pid.compute(self.target_yaw, self.orient.body_rate.z)
         self.yaw = self.constrain(self.yaw, -2, 2)
 
     def takeoff(self):
@@ -117,7 +117,7 @@ class Planner():
             self.target_altitude = altitude
         if yaw is not None:
             self.target_yaw = radians(yaw)
-            self.target_yaw = self.normalize_radians(self.target_yaw)
+            self.target_yaw = -self.remap_by_max_min(self.target_yaw, 2*pi, 0, -pi, pi)
 
     def set_throttle(self, throttle: int | float = None):
         if throttle < 1000:
@@ -126,8 +126,20 @@ class Planner():
 
         self.throttle = throttle
     
+    def set_ang_zero(self, z):
+        self.z_zero = z
+    
     def set_attitude(self, att):
         self.orient = att
+        
+        self.orient.body_rate.x = -self.orient.body_rate.x
+        self.orient.body_rate.y = -self.orient.body_rate.y
+        self.orient.body_rate.z = -self.remap_by_max_min(self.orient.body_rate.z, (2*pi) - self.z_zero, (0 - self.z_zero), -pi, pi)
+        
+        # print(f"X:\t{self.orient.body_rate.x}\nY:\t{self.orient.body_rate.y}\nZ:\t{self.orient.body_rate.z}\n")
+        
+    def set_odom(self, odom):
+        self.odom = odom
 
     def set_vel_x(self, x: int | float = None):
         self.pitch_corrected = 1500 + int(self.remap_by_max_min(x, -2, 2, -300, 300))
@@ -135,21 +147,11 @@ class Planner():
     def set_vel_y(self, y: int | float = None):
         self.roll_corrected = 1500 + int(self.remap_by_max_min(y, -2, 2, -300, 300))
 
-    def set_attitude(self, attitude):
-        self.orient = attitude
-
     def transform_speed_to_local(self):
-        roll_rad = self.normalize_radians(self.orient.body_rate.y)
-        pitch_rad = self.normalize_radians(self.orient.body_rate.x)
+        roll_rad = self.orient.body_rate.x
+        pitch_rad = self.orient.body_rate.y
+        yaw_rad = self.orient.body_rate.z
         
-        print(f"Normal orient YAW:\t{self.orient.body_rate.z}")
-        
-        yaw_rad = self.normalize_radians(self.orient.body_rate.z)
-
-
-        print(f"Normal orient YAW:\t{yaw_rad}")
-        
-        # print(f"Roll:\t{roll_rad}\nPitch:\t{pitch_rad}\nYaw:\t{yaw_rad}")
         syaw = sin(yaw_rad)
         cyaw = cos(yaw_rad)
 
