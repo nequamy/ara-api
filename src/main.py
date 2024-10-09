@@ -1,4 +1,4 @@
-from src.app import Api
+from app import Api
 from lib.drone import ARA_mini
 from lib.stream import Stream
 
@@ -46,35 +46,15 @@ def main():
 
     ######## Начало кода ########
 
-    # Пример
-
     api.set_arm_state(1)
-    time.sleep(2)
     api.set_nav_state(2)
-    time.sleep(2)
-    api.takeoff(1.5)
-    time.sleep(15)
-    api.land()
 
-    print(api.go_to_xy(1, 1))
-
-    # while not (stream.get_id() == 1):
-    #     api.set_velocity_x(1)
-    # else:
-    #     api.set_velocity_x(0)
-    #
-    # while not (stream.get_id() == 2):
-    #     api.set_velocity_y(1)
-    # else:
-    #     api.set_velocity_y(0)
+    print(api.go_to_xy(1, 0, 0))
 
     ######## Конец кода ########
 
-    stream_thread.join()
     update_thread.join()
-
-    api.reset_state()
-    api.load_data()
+    stream_thread.join()
 
 
 if __name__ == "__main__":

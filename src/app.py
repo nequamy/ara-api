@@ -110,6 +110,7 @@ class Api(object):
         self.update_rc_in()
         self.update_odometry()
         self.drone_planner.set_attitude(self.attitude)
+        self.drone_planner.set_odom(self.odom)
 
     def load_data(self) -> None:
         self.rc_out.channels[0] = self.drone_planner.roll_corrected
@@ -119,8 +120,8 @@ class Api(object):
         self.rc_out.channels[4] = (self.arm_state * 1000) + 1000
         self.rc_out.channels[6] = (self.nav_state * 500) + 1000
 
-        print(f"RC:\t{self.rc_out.channels[0:8]}\nOdom:\n\tX - \t{self.odom['position'][0]}\n\tY - \t{self.odom['position'][1]}\n\tZ - \t{self.odom['position'][2]}\n"
-              f"Angle X:\t{self.attitude.body_rate.x}\nAngle Y:\t{self.attitude.body_rate.y}\nAngle Z:\t{self.attitude.body_rate.z}\n")
+        # print(f"RC:\t{self.rc_out.channels[0:8]}\nOdom:\n\tX - \t{self.odom['position'][0]}\n\tY - \t{self.odom['position'][1]}\n\tZ - \t{self.odom['position'][2]}\n"
+        #       f"Angle X:\t{self.attitude.body_rate.x}\nAngle Y:\t{self.attitude.body_rate.y}\nAngle Z:\t{self.attitude.body_rate.z}\n")
 
         self.cmd_send()
 
@@ -175,12 +176,11 @@ class Api(object):
             return False
 
     def go_to_xy(self, x: float = None, y: float = None,
-                 auto_land: bool = False) -> bool:
-        self.drone_planner.set_point(x=x, y=y)
-        self.drone_planner.set_attitude(self.attitude)
+                 yaw: int = None, auto_land: bool = False) -> bool:
+        self.drone_planner.set_point(x=x, y=y, yaw=yaw)
 
         while not self.drone_planner.check_desired_position():
-            self.drone_planner.compute(self.odom, self.attitude)
+            self.drone_planner.compute()
 
         self.drone_planner.roll_corrected = 1500
         self.drone_planner.pitch_corrected = 1500
@@ -273,6 +273,7 @@ class Api(object):
             self.ang_x_zero = radians(self.driver.SENSOR_DATA['kinematics'][0])
             self.ang_y_zero = radians(self.driver.SENSOR_DATA['kinematics'][1])
             self.ang_z_zero = radians(self.driver.SENSOR_DATA['kinematics'][2])
+            self.drone_planner.set_ang_zero(self.ang_z_zero)
             self.att_zero_flag = False
 
         self.ang_x = radians(self.driver.SENSOR_DATA['kinematics'][0]) - self.ang_x_zero

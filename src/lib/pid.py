@@ -27,6 +27,7 @@ class PID(object):
     def compute(self, setpoint, value):
         self.curr_time = time.time() if self.curr_time == None else self.curr_time
         self.err = setpoint - value
+        # print(f"Error:\t{value}")
         
         self.dt = (self.curr_time - self.prev_time) if (self.curr_time - self.prev_time) > 0 else 0.1
         
@@ -36,7 +37,7 @@ class PID(object):
         self.prev_time = self.curr_time
         self.curr_time = time.time()
         
-        # print(f"Pterm:\t{self.p_term}\nIterm:\t{self.i_term}\nDterm:\t{self.d_term}")
+        # print(f"Pterm:\t{self.p_term}\nIterm:\t{self.i_term}\nDterm:\t{self.d_term}\n")
         self.pid = self.p_term + self.ki * self.i_term + self.d_term * self.kd
 
         self.constrain(-2, 2)

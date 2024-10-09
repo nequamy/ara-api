@@ -141,8 +141,14 @@ class Planner():
     def transform_speed_to_local(self):
         roll_rad = self.normalize_radians(self.orient.body_rate.y)
         pitch_rad = self.normalize_radians(self.orient.body_rate.x)
+        
+        print(f"Normal orient YAW:\t{self.orient.body_rate.z}")
+        
         yaw_rad = self.normalize_radians(self.orient.body_rate.z)
 
+
+        print(f"Normal orient YAW:\t{yaw_rad}")
+        
         # print(f"Roll:\t{roll_rad}\nPitch:\t{pitch_rad}\nYaw:\t{yaw_rad}")
         syaw = sin(yaw_rad)
         cyaw = cos(yaw_rad)
