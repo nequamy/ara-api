@@ -34,27 +34,29 @@ P.s. строчки над "Начало кода" и под "Конец код�
 
 def main():
     drone = ARA_mini()
+    # api = Api("127.0.0.1", 5760, drone)
     api = Api("192.168.2.113", 5760, drone)
-    stream = Stream()
+    api.update_loop()
+    # stream = Stream()
 
-    stream_thread = Thread(target=stream.stream, args=(), daemon=True)
-    update_thread = Thread(target=api.update_loop, args=(), daemon=True)
-    stream_thread.start()
-    update_thread.start()
+    # stream_thread = Thread(target=stream.stream, args=(), daemon=True)
+    # update_thread = Thread(target=api.update_loop, args=(), daemon=True)
+    # stream_thread.start()
+    # update_thread.start()
+    #
+    # time.sleep(1)
+    #
+    ####### Начало кода ########
 
-    time.sleep(1)
-
-    ######## Начало кода ########
-
-    api.set_arm_state(1)
-    api.set_nav_state(2)
+    # api.set_arm_state(1)
+    # api.set_nav_state(2)
 
     print(api.go_to_xy(1, 0, 0))
-
-    ######## Конец кода ########
-
-    update_thread.join()
-    stream_thread.join()
+    #
+    ####### Конец кода ########
+    #
+    # update_thread.join()
+    # stream_thread.join()
 
 
 if __name__ == "__main__":

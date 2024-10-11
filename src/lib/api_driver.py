@@ -169,7 +169,7 @@ class MultirotorControl:
         'MSP_SET_RESET_CURR_PID':         219,
         'MSP_SET_SENSOR_ALIGNMENT':       220,
         'MSP_SET_LED_STRIP_MODECOLOR':    221,
-        'MSP_SET_MOTOR_CONFIG':           222,
+        'MSP_ODOM':                       222,
         'MSP_SET_GPS_CONFIG':             223,
         'MSP_SET_COMPASS_CONFIG':         224,
         'MSP_SET_GPS_RESCUE':             225,
@@ -328,6 +328,11 @@ class MultirotorControl:
             'sonar':                      0,
             'kinematics':                 [0.0, 0.0, 0.0],
             'debug':                      [0, 0, 0, 0, 0, 0, 0, 0], # 8 values for special situations like MSP2_INAV_DEBUG
+            'odom':                       {
+                                            'position':         [0,0,0],
+                                            'velocity':         [0,0,0],
+                                            'yaw':              [0],
+                                          }
         }
         
         self.ODOMETRY = {
@@ -863,8 +868,7 @@ class MultirotorControl:
         self.serial_port_read_lock = Lock()
 
         self.INAV = True
-        
-        
+
     def __enter__(self):
             
         self.is_transmitter_open = self.connect()
@@ -874,7 +878,6 @@ class MultirotorControl:
             
         else:
             return 1
-            
 
     def __exit__(self):
             
@@ -882,7 +885,6 @@ class MultirotorControl:
             self.transmitter.disconnect()
 
             logging.info("Transmitter is closed")
-
 
     def connect(self, trials = 100, delay = 1) -> bool:
 
@@ -902,7 +904,6 @@ class MultirotorControl:
         return False
     
     def basic_info(self):
-    
         for msg in ['MSP_API_VERSION', 'MSP_FC_VARIANT']:
             if self.send_RAW_msg(MultirotorControl.MSPCodes[msg], data=[]):
                 dataHandler = self.receive_msg()
@@ -924,102 +925,42 @@ class MultirotorControl:
                 dataHandler = self.receive_msg()
                 self.process_recv_data(dataHandler)
 
-    def fast_read_altitude(self):
-    
-        if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_ALTITUDE']):
-            data_length = 4
-            msg = self.receive_raw_msg(size = (6+data_length))[5:]
-            converted_msg = struct.unpack('<i', msg[:-1])[0]
-            self.SENSOR_DATA['altitude'] = round((converted_msg / 100.0), 2) # correct scale factor
+    def msp_read_sensor_data(self):
+        if self.send_RAW_msg(self.MSPCodes["MSP_RAW_IMU"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
+        if self.send_RAW_msg(self.MSPCodes["MSP_ATTITUDE"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
+        if self.send_RAW_msg(self.MSPCodes["MSP_DEBUG"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
+        if self.send_RAW_msg(self.MSPCodes["MSP_ALTITUDE"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
+        if self.send_RAW_msg(self.MSPCodes["MSP_SONAR"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
+        if self.send_RAW_msg(self.MSPCodes["MSP_ODOM"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
 
-    def fast_read_imu(self):
+    def msp_read_motor_data(self):
+        if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_MOTOR']):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
 
-        if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_RAW_IMU']):
-
-            data_length = 18
-            msg = self.receive_raw_msg(size = (6+data_length))[5:]
-            converted_msg = struct.unpack('<%dh' % (len(msg)/2) , msg[:-1])
-
-            if len(converted_msg) > 0:
-                self.SENSOR_DATA['accelerometer'][0] = converted_msg[0]
-                self.SENSOR_DATA['accelerometer'][1] = converted_msg[1]
-                self.SENSOR_DATA['accelerometer'][2] = converted_msg[2]
-
-                self.SENSOR_DATA['gyroscope'][0] = converted_msg[3]
-                self.SENSOR_DATA['gyroscope'][1] = converted_msg[4]
-                self.SENSOR_DATA['gyroscope'][2] = converted_msg[5]
-
-                self.SENSOR_DATA['magnetometer'][0] = converted_msg[6]
-                self.SENSOR_DATA['magnetometer'][1] = converted_msg[7]
-                self.SENSOR_DATA['magnetometer'][2] = converted_msg[8]
-                
-
-    def fast_read_status(self):
-        if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_STATUS'], data=[]):
-            dataHandler = self.receive_msg()
-            self.process_recv_data(dataHandler)
-        if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_STATUS_EX'], data=[]):
-            dataHandler = self.receive_msg()
-            self.process_recv_data(dataHandler)
-
-    def fast_read_attitude(self):
-        if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_ATTITUDE']):
-            data_length = 6
-            msg = self.receive_raw_msg(size = (6+data_length))[5:]
-            converted_msg = struct.unpack('<%dh' % (len(msg)/2) , msg[:-1])
-            
-            self.SENSOR_DATA['kinematics'][0] = converted_msg[0] / 10.0 # x
-            self.SENSOR_DATA['kinematics'][1] = converted_msg[1] / 10.0 # y
-            self.SENSOR_DATA['kinematics'][2] = converted_msg[2] # z
-    
-    def fast_read_odom(self):
-        if self.send_RAW_msg(222):
-            data_lenght = 32
-            msg = bytearray(self.receive_raw_msg(size=(6+data_lenght))[5:])
-            converted_msg = struct.unpack('<7i', msg[:28])
-            # print(converted_msg)
-            try:
-                self.ODOMETRY['position'][0] = -(converted_msg[0] / 100_000)
-                self.ODOMETRY['position'][1] = (converted_msg[1] / 100_000)
-                self.ODOMETRY['position'][2] = (converted_msg[2] / 100_000)
-                self.ODOMETRY['velocity'][2] = (converted_msg[3] / 100_000)
-                self.ODOMETRY['velocity'][0] = -(converted_msg[4] / 100_000)
-                self.ODOMETRY['velocity'][1] = (converted_msg[5] / 100_000)
-                self.ODOMETRY['yaw'] = radians(converted_msg[6] / 10)
-
-                # print(self.ODOMETRY)
-
-                return self.ODOMETRY
-            except:
-                pass
-
-    def fast_read_rc_channels(self):
+    def msp_read_rc_channels_data(self):
         if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_RC']):
-            data_lenght = 36
-            msg = bytearray(self.receive_raw_msg(size = (6+data_lenght))[5:])
-            converted_msg = struct.unpack('<%dh' % (len(msg)/2) , msg[:-1])
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
 
-    def fast_read_analog(self):
-        pass
-        # if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_ANALOG']):
-            # data_length = 8
-            # msg = bytearray(self.receive_raw_msg(size = (6+data_length))[5:])
-            # print(len(msg))
-            # converted_msg = struct.unpack('<%dh' % (data_length/2) , msg[:-1])
-            
-            # print(converted_msg)
-            
-            # # self.ANALOG['voltage'] = converted_msg[0] / 10 
-            # # self.ANALOG['mAhdrawn'] = converted_msg[1]
-            # # self.ANALOG['rssi'] = converted_msg[2] 
-            # # self.ANALOG['amperage'] = converted_msg[3] / 100 
-            # # self.ANALOG['last_received_timestamp'] = int(time.time()) 
-            # # if not self.INAV:
-            # #     self.ANALOG['voltage'] = converted_msg[4] / 100
-
+    def msp_read_box_data(self):
+        if self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_BOXNAMES']):
+            data_handler = self.receive_msg()
+            self.process_MSP_BOXNAMES(data_handler)
 
     def fast_msp_rc_cmd(self, cmds):
-
         cmds = [int(cmd) for cmd in cmds]
         data = struct.pack('<%dH' % len(cmds), *cmds)
         
@@ -1258,7 +1199,6 @@ class MultirotorControl:
             unpack_format = unpack_format.upper()
 
         return struct.unpack('<' + unpack_format, buffer)[0]
-    
 
     def process_armingDisableFlags(self, flags):
         result = []
@@ -1270,7 +1210,6 @@ class MultirotorControl:
             else:
                 result.append(self.armingDisableFlagNames_BF.get(bitpos, ""))
         return result
-    
 
     def process_mode(self, flag):
 
@@ -1284,7 +1223,6 @@ class MultirotorControl:
     @staticmethod
     def bit_check(mask, bit):
         return ((mask>>bit)%2) != 0
-    
 
     def serialPortFunctionMaskToFunctions(self, functionMask):
         functions = []
@@ -1295,7 +1233,6 @@ class MultirotorControl:
             if (self.bit_check(functionMask, bit)):
                 functions.append(key)
         return functions
-    
 
     @staticmethod
     def convert(val_list, n=16): 
@@ -1495,6 +1432,56 @@ class MultirotorControl:
         self.SENSOR_DATA['magnetometer'][1] = self.readbytes(data, size=16, unsigned=False)
         self.SENSOR_DATA['magnetometer'][2] = self.readbytes(data, size=16, unsigned=False)
 
+    def process_MSP_ATTITUDE(self, data):
+        self.SENSOR_DATA['kinematics'][0] = self.readbytes(data, size=16, unsigned=False) / 10.0  # x
+        self.SENSOR_DATA['kinematics'][1] = self.readbytes(data, size=16, unsigned=False) / 10.0  # y
+        self.SENSOR_DATA['kinematics'][2] = self.readbytes(data, size=16, unsigned=False)  # z
+
+    def process_MSP_ALTITUDE(self, data):
+        self.SENSOR_DATA['altitude'] = round((self.readbytes(data, size=32, unsigned=False) / 100.0),
+                                             2)  # correct scale factor
+
+    def process_MSP_SONAR(self, data):
+        self.SENSOR_DATA['sonar'] = self.readbytes(data, size=32, unsigned=False)
+
+    def process_MSP_ANALOG(self, data):
+        self.ANALOG['voltage'] = self.readbytes(data, size=8, unsigned=True) / 10.0
+        self.ANALOG['mAhdrawn'] = self.readbytes(data, size=16, unsigned=True)
+        self.ANALOG['rssi'] = self.readbytes(data, size=16, unsigned=True)  # 0-1023
+        self.ANALOG['amperage'] = self.readbytes(data, size=16, unsigned=False) / 100  # A
+        self.ANALOG['last_received_timestamp'] = int(time.time())  # why not monotonic? where is time synchronized?
+        if not self.INAV:
+            self.ANALOG['voltage'] = self.readbytes(data, size=16, unsigned=True) / 100
+
+    def process_MSP_ODOM(self, data):
+        self.SENSOR_DATA['odom']['position'][0] = self.readbytes(data, size=32, unsigned=False) / 100_000
+        self.SENSOR_DATA['odom']['position'][1] = self.readbytes(data, size=32, unsigned=False) / 100_000
+        self.SENSOR_DATA['odom']['position'][2] = self.readbytes(data, size=32, unsigned=False) / 100_000
+        self.SENSOR_DATA['odom']['velocity'][0] = self.readbytes(data, size=32, unsigned=False) / 100_000
+        self.SENSOR_DATA['odom']['velocity'][1] = self.readbytes(data, size=32, unsigned=False) / 100_000
+        self.SENSOR_DATA['odom']['velocity'][2] = self.readbytes(data, size=32, unsigned=False) / 100_000
+        self.SENSOR_DATA['odom']['yaw'] = radians(int(self.readbytes(data, size=32, unsigned=False) / 10))
+
+    def process_MSPV2_INAV_ANALOG(self, data):
+        if self.INAV:
+            tmp = self.readbytes(data, size=8, unsigned=True)
+            self.ANALOG['battery_full_when_plugged_in'] = True if (tmp & 1) else False
+            self.ANALOG['use_capacity_thresholds'] = True if ((tmp & 2) >> 1) else False
+            self.ANALOG['battery_state'] = (tmp & 12) >> 2
+            self.ANALOG['cell_count'] = (tmp & 0xF0) >> 4
+
+            self.ANALOG['voltage'] = self.readbytes(data, size=16, unsigned=True) / 100
+            self.ANALOG['amperage'] = self.readbytes(data, size=16, unsigned=True) / 100  # A
+            self.ANALOG['power'] = self.readbytes(data, size=32, unsigned=True) / 100
+            self.ANALOG['mAhdrawn'] = self.readbytes(data, size=32, unsigned=True)
+            self.ANALOG['mWhdrawn'] = self.readbytes(data, size=32, unsigned=True)
+            self.ANALOG['battery_remaining_capacity'] = self.readbytes(data, size=32, unsigned=True)
+            self.ANALOG['battery_percentage'] = self.readbytes(data, size=8, unsigned=True)
+            self.ANALOG['rssi'] = self.readbytes(data, size=16, unsigned=True)  # 0-1023
+
+            # TODO: update both BF and INAV variables
+            self.BATTERY_STATE['cellCount'] = self.ANALOG['cell_count']
+
     def process_MSP_SERVO(self, data):
         servoCount = int(len(data) / 2)
         self.SERVO_DATA = [self.readbytes(data, size=16, unsigned=True) for _ in range(servoCount)]
@@ -1533,46 +1520,6 @@ class MultirotorControl:
         self.GPS_DATA['hdop'] = self.readbytes(data, size=16, unsigned=True)
         self.GPS_DATA['eph'] = self.readbytes(data, size=16, unsigned=True)
         self.GPS_DATA['epv'] = self.readbytes(data, size=16, unsigned=True)
-
-    def process_MSP_ATTITUDE(self, data):
-        self.SENSOR_DATA['kinematics'][0] = self.readbytes(data, size=16, unsigned=False) / 10.0 # x
-        self.SENSOR_DATA['kinematics'][1] = self.readbytes(data, size=16, unsigned=False) / 10.0 # y
-        self.SENSOR_DATA['kinematics'][2] = self.readbytes(data, size=16, unsigned=False) # z
-
-    def process_MSP_ALTITUDE(self, data):
-        self.SENSOR_DATA['altitude'] = round((self.readbytes(data, size=32, unsigned=False) / 100.0), 2) # correct scale factor
-
-    def process_MSP_SONAR(self, data):
-        self.SENSOR_DATA['sonar'] = self.readbytes(data, size=32, unsigned=False)
-        
-    def process_MSP_ANALOG(self, data):
-        self.ANALOG['voltage'] = self.readbytes(data, size=8, unsigned=True) / 10.0
-        self.ANALOG['mAhdrawn'] = self.readbytes(data, size=16, unsigned=True)
-        self.ANALOG['rssi'] = self.readbytes(data, size=16, unsigned=True) # 0-1023
-        self.ANALOG['amperage'] = self.readbytes(data, size=16, unsigned=False) / 100 # A
-        self.ANALOG['last_received_timestamp'] = int(time.time()) # why not monotonic? where is time synchronized?
-        if not self.INAV:
-            self.ANALOG['voltage'] = self.readbytes(data, size=16, unsigned=True) / 100
-    
-    def process_MSPV2_INAV_ANALOG(self, data):
-        if self.INAV:
-            tmp = self.readbytes(data, size=8, unsigned=True)
-            self.ANALOG['battery_full_when_plugged_in'] = True if (tmp & 1) else False
-            self.ANALOG['use_capacity_thresholds'] = True if ((tmp & 2) >> 1) else False
-            self.ANALOG['battery_state'] = (tmp & 12) >> 2
-            self.ANALOG['cell_count'] = (tmp & 0xF0) >> 4
-
-            self.ANALOG['voltage'] = self.readbytes(data, size=16, unsigned=True) / 100
-            self.ANALOG['amperage'] = self.readbytes(data, size=16, unsigned=True) / 100 # A
-            self.ANALOG['power'] = self.readbytes(data, size=32, unsigned=True) / 100
-            self.ANALOG['mAhdrawn'] = self.readbytes(data, size=32, unsigned=True)
-            self.ANALOG['mWhdrawn'] = self.readbytes(data, size=32, unsigned=True)
-            self.ANALOG['battery_remaining_capacity'] = self.readbytes(data, size=32, unsigned=True)
-            self.ANALOG['battery_percentage'] = self.readbytes(data, size=8, unsigned=True)
-            self.ANALOG['rssi'] = self.readbytes(data, size=16, unsigned=True) # 0-1023
-
-            # TODO: update both BF and INAV variables
-            self.BATTERY_STATE['cellCount'] = self.ANALOG['cell_count']
 
     def process_MSP_VOLTAGE_METERS(self, data):
         total_bytes_per_meter = (8+8)/8 # just to make it clear where it comes from...

@@ -104,13 +104,19 @@ class Api(object):
 
             self.load_data()
 
+            time.sleep(0.1)
+
     def update_data(self) -> None:
+        self.driver.basic_info()
+        self.driver.msp_read_sensor_data()
+        self.driver.msp_read_rc_channels_data()
+        # self.driver.msp_read_box_data()
         self.update_imu()
-        self.update_attitude()
-        self.update_rc_in()
-        self.update_odometry()
-        self.drone_planner.set_attitude(self.attitude)
-        self.drone_planner.set_odom(self.odom)
+        # self.update_attitude()
+        # self.update_rc_in()
+        # self.update_odometry()
+        # self.drone_planner.set_attitude(self.attitude)
+        # self.drone_planner.set_odom(self.odom)
 
     def load_data(self) -> None:
         self.rc_out.channels[0] = self.drone_planner.roll_corrected
@@ -124,6 +130,118 @@ class Api(object):
         #       f"Angle X:\t{self.attitude.body_rate.x}\nAngle Y:\t{self.attitude.body_rate.y}\nAngle Z:\t{self.attitude.body_rate.z}\n")
 
         self.cmd_send()
+
+    def update_imu(self):
+        """
+        Function for publishing accelerometer, gyroscope and drone orientation values
+
+        publish: sensor_msgs/Imu
+        """
+        self.imu.linear_acceleration.x = self.driver.SENSOR_DATA['accelerometer'][0]
+        self.imu.linear_acceleration.y = self.driver.SENSOR_DATA['accelerometer'][1]
+        self.imu.linear_acceleration.z = self.driver.SENSOR_DATA['accelerometer'][2]
+
+        self.imu.angular_velocity.x = self.driver.SENSOR_DATA['gyroscope'][0]
+        self.imu.angular_velocity.y = self.driver.SENSOR_DATA['gyroscope'][1]
+        self.imu.angular_velocity.z = self.driver.SENSOR_DATA['gyroscope'][2]
+
+        print(self.driver.RC)
+
+    def update_altitude(self):
+        """
+        Function for publishing altitude values from barometer and rangefinder from FC
+
+        publish: eagle_eye_msgs/Altitude
+        """
+
+        self.altitude.monotonic = self.driver.SENSOR_DATA['altitude']
+        self.altitude.relative = float(self.driver.SENSOR_DATA['sonar'])
+        self.barometer.altitude = float(self.driver.SENSOR_DATA['sonar'])
+
+    def update_odometry(self):
+        """
+        Function for publishing optical flow values.
+
+        publish: eagle_eye_msgs/OpticalFlow
+        """
+        self.odom = self.driver.SENSOR_DATA['odom']
+
+        if self.odom_zero_flag:
+            self.odom_zero['position'][0] = self.odom['position'][0]
+            self.odom_zero['position'][1] = self.odom['position'][1]
+            self.odom_zero['position'][2] = self.odom['position'][2]
+            self.odom_zero['yaw'] = self.odom['yaw']
+            self.odom_zero_flag = False
+
+        self.odom['position'][0] = -round(self.odom['position'][0] - self.odom_zero['position'][0], 2)
+        self.odom['position'][1] = round(self.odom['position'][1] - self.odom_zero['position'][1], 2)
+        self.odom['position'][2] = round(self.odom['position'][2] - self.odom_zero['position'][2], 2)
+        self.odom['yaw'] = self.odom['yaw'] - self.odom_zero['yaw']
+
+    def update_attitude(self):
+        """
+        Function for publishing more accurate orientation
+        based on complementary filter from FC (heading)
+
+        publish: eagle_eye_msgs/Attitude
+        """
+
+        if self.att_zero_flag:
+            self.ang_x_zero = radians(self.driver.SENSOR_DATA['kinematics'][0])
+            self.ang_y_zero = radians(self.driver.SENSOR_DATA['kinematics'][1])
+            self.ang_z_zero = radians(self.driver.SENSOR_DATA['kinematics'][2])
+            self.drone_planner.set_ang_zero(self.ang_z_zero)
+            self.att_zero_flag = False
+
+        self.ang_x = radians(self.driver.SENSOR_DATA['kinematics'][0]) - self.ang_x_zero
+        self.ang_y = radians(self.driver.SENSOR_DATA['kinematics'][1]) - self.ang_y_zero
+        self.ang_z = radians(self.driver.SENSOR_DATA['kinematics'][2]) - self.ang_z_zero
+
+        self.attitude.body_rate.x = self.ang_x
+        self.attitude.body_rate.y = self.ang_y
+        self.attitude.body_rate.z = self.ang_z
+
+    def update_basic(self):
+        """
+        Function for publishing information about flags inside FC
+
+        int32 cycle_time - time of one FC iteration; \n
+        int32 cpuload - FC CPU load (in percent); \n
+        int32 arming_disable_count - disable count of arming; \n
+
+        string[] arming_disable_flags - flags of internal FC errors; \n
+        string[] active_sensors - enabled sensors (not only working ones); \n
+        string[] mode - current modes of the flyer. \n
+
+        publish: eagle_eye_msgs/Flags
+        """
+
+        self.flags.cycle_time = self.driver.CONFIG['cycleTime']
+        self.flags.arming_disable_count = self.driver.CONFIG['armingDisableCount']
+
+        self.flags.arming_disable_flags = self.finder(self.driver.CONFIG['armingDisableFlags'],
+                                                      self.driver.armingCheckFlags_INAV)
+        self.flags.active_sensors = self.finder(self.driver.CONFIG['activeSensors'],
+                                                self.driver.sensorsCheckFlags_INAV)
+        self.flags.mode = self.finder(int(self.driver.CONFIG['mode'] / 8),
+                                      self.driver.modesCheckFlags_INAV)
+
+    def update_rc_in(self):
+        """
+        Function for reading RC channels coming from the remote driver unit
+
+        publish: eagle_eye_msgs/Channels
+        """
+        self.driver.fast_read_rc_channels()
+        self.channels.channels = self.driver.RC['channels']
+
+    def cmd_send(self):
+        """
+        Function for sending values on RC channels to FC via MSP protocol
+
+        publish: eagle_eye_msgs/Channels
+        """
+        self.driver.fast_msp_rc_cmd(self.rc_out.channels)
 
     def set_arm_state(self, state: bool = 0) -> bool:
         self.arm_state = int(state)
@@ -191,174 +309,6 @@ class Api(object):
             self.land(auto_disarm=True)
 
         return True
-
-    def update_imu(self):
-        """
-        Function for publishing accelerometer, gyroscope and drone orientation values
-
-        publish: sensor_msgs/Imu
-        """
-
-        self.driver.fast_read_imu()
-        self.imu.linear_acceleration.x = self.driver.SENSOR_DATA['accelerometer'][0]
-        self.imu.linear_acceleration.y = self.driver.SENSOR_DATA['accelerometer'][1]
-        self.imu.linear_acceleration.z = self.driver.SENSOR_DATA['accelerometer'][2]
-
-        self.imu.angular_velocity.x = self.driver.SENSOR_DATA['gyroscope'][0]
-        self.imu.angular_velocity.y = self.driver.SENSOR_DATA['gyroscope'][1]
-        self.imu.angular_velocity.z = self.driver.SENSOR_DATA['gyroscope'][2]
-
-        self.roll_acc = atan2(self.imu.linear_acceleration.y, self.imu.linear_acceleration.z)
-        self.pitch_acc = atan2(-self.imu.linear_acceleration.x,
-                               sqrt(self.imu.linear_acceleration.y * self.imu.linear_acceleration.y
-                                    + self.imu.linear_acceleration.z * self.imu.linear_acceleration.z))
-
-        self.roll_rate = self.driver.SENSOR_DATA['gyroscope'][0]
-        self.pitch_rate = self.driver.SENSOR_DATA['gyroscope'][1]
-        self.yaw_rate = self.driver.SENSOR_DATA['gyroscope'][2]
-
-        self.roll += self.dt * (self.roll_rate - self.Kp * self.roll_acc + self.Ki * self.roll)
-        self.pitch += self.dt * (self.pitch_rate - self.Kp * self.pitch_acc + self.Ki * self.pitch)
-        self.yaw += self.dt * self.yaw_rate
-
-        quat = self.euler_to_quaternion(self.roll, self.pitch, self.yaw)
-
-        self.imu.orientation.x = quat[0]
-        self.imu.orientation.y = quat[1]
-        self.imu.orientation.z = quat[2]
-        self.imu.orientation.w = quat[3]
-
-    def update_altitude(self):
-        """
-        Function for publishing altitude values from barometer and rangefinder from FC
-
-        publish: eagle_eye_msgs/Altitude
-        """
-
-        self.driver.fast_read_altitude()
-        self.altitude.monotonic = self.driver.SENSOR_DATA['altitude']
-        self.altitude.relative = float(self.driver.SENSOR_DATA['sonar'])
-        self.barometer.altitude = float(self.driver.SENSOR_DATA['sonar'])
-
-    def update_odometry(self):
-        """
-        Function for publishing optical flow values.
-
-        publish: eagle_eye_msgs/OpticalFlow
-        """
-        self.odom = self.driver.fast_read_odom()
-
-        if self.odom_zero_flag:
-            self.odom_zero['position'][0] = self.odom['position'][0]
-            self.odom_zero['position'][1] = self.odom['position'][1]
-            self.odom_zero['position'][2] = self.odom['position'][2]
-            self.odom_zero['yaw'] = self.odom['yaw']
-            self.odom_zero_flag = False
-
-        self.odom['position'][0] = -round(self.odom['position'][0] - self.odom_zero['position'][0], 2)
-        self.odom['position'][1] = round(self.odom['position'][1] - self.odom_zero['position'][1], 2)
-        self.odom['position'][2] = round(self.odom['position'][2] - self.odom_zero['position'][2], 2)
-        self.odom['yaw'] = self.odom['yaw'] - self.odom_zero['yaw']
-
-    def update_attitude(self):
-        """
-        Function for publishing more accurate orientation
-        based on complementary filter from FC (heading)
-
-        publish: eagle_eye_msgs/Attitude
-        """
-        self.driver.fast_read_attitude()
-
-        if self.att_zero_flag:
-            self.ang_x_zero = radians(self.driver.SENSOR_DATA['kinematics'][0])
-            self.ang_y_zero = radians(self.driver.SENSOR_DATA['kinematics'][1])
-            self.ang_z_zero = radians(self.driver.SENSOR_DATA['kinematics'][2])
-            self.drone_planner.set_ang_zero(self.ang_z_zero)
-            self.att_zero_flag = False
-
-        self.ang_x = radians(self.driver.SENSOR_DATA['kinematics'][0]) - self.ang_x_zero
-        self.ang_y = radians(self.driver.SENSOR_DATA['kinematics'][1]) - self.ang_y_zero
-        self.ang_z = radians(self.driver.SENSOR_DATA['kinematics'][2]) - self.ang_z_zero
-
-        self.attitude.body_rate.x = self.ang_x
-        self.attitude.body_rate.y = self.ang_y
-        self.attitude.body_rate.z = self.ang_z
-
-        quat = self.euler_to_quaternion(self.ang_x, self.ang_y, self.ang_z)
-
-        self.attitude.orientation.x = quat[0]
-        self.attitude.orientation.y = quat[1]
-        self.attitude.orientation.z = quat[2]
-        self.attitude.orientation.w = quat[3]
-
-    def update_basic(self):
-        """
-        Function for publishing information about flags inside FC
-
-        int32 cycle_time - time of one FC iteration; \n
-        int32 cpuload - FC CPU load (in percent); \n
-        int32 arming_disable_count - disable count of arming; \n
-
-        string[] arming_disable_flags - flags of internal FC errors; \n
-        string[] active_sensors - enabled sensors (not only working ones); \n
-        string[] mode - current modes of the flyer. \n
-
-        publish: eagle_eye_msgs/Flags
-        """
-        self.driver.fast_read_status()
-
-        self.flags.cycle_time = self.driver.CONFIG['cycleTime']
-        self.flags.arming_disable_count = self.driver.CONFIG['armingDisableCount']
-
-        self.flags.arming_disable_flags = self.finder(self.driver.CONFIG['armingDisableFlags'],
-                                                      self.driver.armingCheckFlags_INAV)
-        self.flags.active_sensors = self.finder(self.driver.CONFIG['activeSensors'],
-                                                self.driver.sensorsCheckFlags_INAV)
-        self.flags.mode = self.finder(int(self.driver.CONFIG['mode'] / 8),
-                                      self.driver.modesCheckFlags_INAV)
-
-    def update_rc_in(self):
-        """
-        Function for reading RC channels coming from the remote driver unit
-
-        publish: eagle_eye_msgs/Channels
-        """
-        self.driver.fast_read_rc_channels()
-        self.channels.channels = self.driver.RC['channels']
-
-    def cmd_send(self):
-        """
-        Function for sending values on RC channels to FC via MSP protocol
-
-        publish: eagle_eye_msgs/Channels
-        """
-        self.driver.fast_msp_rc_cmd(self.rc_out.channels)
-
-    @staticmethod
-    def finder(flags: int, dict_flags: dict):
-        """
-        Function to search for matching byte flags in the dictionary
-
-        :rtype: String[]
-        :return: string array of matches with flags
-        """
-        msg = []
-        for k, v in dict_flags.items():
-            if int(flags) & v:
-                msg.append(k)
-        return msg
-
-    def euler_to_quaternion(self, roll, pitch, yaw):
-        qx = np.sin(roll / 2) * np.cos(pitch / 2) * np.cos(yaw / 2) - np.cos(roll / 2) * np.sin(pitch / 2) * np.sin(
-            yaw / 2)
-        qy = np.cos(roll / 2) * np.sin(pitch / 2) * np.cos(yaw / 2) + np.sin(roll / 2) * np.cos(pitch / 2) * np.sin(
-            yaw / 2)
-        qz = np.cos(roll / 2) * np.cos(pitch / 2) * np.sin(yaw / 2) - np.sin(roll / 2) * np.sin(pitch / 2) * np.cos(
-            yaw / 2)
-        qw = np.cos(roll / 2) * np.cos(pitch / 2) * np.cos(yaw / 2) + np.sin(roll / 2) * np.sin(pitch / 2) * np.sin(
-            yaw / 2)
-
-        return [qx, qy, qz, qw]
 
     def reset_state(self):
         self.arm_state = 0
