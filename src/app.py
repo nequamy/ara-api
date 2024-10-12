@@ -104,7 +104,7 @@ class Api(object):
 
             self.load_data()
 
-            time.sleep(0.1)
+            time.sleep(0.05)
 
     def update_data(self) -> None:
         self.driver.basic_info()
@@ -145,7 +145,7 @@ class Api(object):
         self.imu.angular_velocity.y = self.driver.SENSOR_DATA['gyroscope'][1]
         self.imu.angular_velocity.z = self.driver.SENSOR_DATA['gyroscope'][2]
 
-        print(self.driver.RC)
+        print(self.driver.SENSOR_DATA['optical_flow'])
 
     def update_altitude(self):
         """
