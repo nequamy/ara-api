@@ -1,5 +1,6 @@
 import math
 
+from driver.protoc import driver_pb2, driver_pb2_grpc
 from navigation.pid import PID
 from navigation.drone import Drone
 from data.attitude import Attitude

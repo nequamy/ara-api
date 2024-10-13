@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import navigation_pb2 as navigation__pb2
+from navigation.protoc import navigation_pb2 as navigation__pb2
 
 GRPC_GENERATED_VERSION = '1.66.2'
 GRPC_VERSION = grpc.__version__

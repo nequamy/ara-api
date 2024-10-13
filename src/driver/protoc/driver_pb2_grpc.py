@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import driver_pb2 as driver__pb2
+from driver.protoc import driver_pb2 as driver__pb2
 
 GRPC_GENERATED_VERSION = '1.66.2'
 GRPC_VERSION = grpc.__version__

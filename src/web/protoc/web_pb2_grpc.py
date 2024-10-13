@@ -3,10 +3,10 @@
 import grpc
 import warnings
 
-import driver_pb2 as driver__pb2
-import navigation_pb2 as navigation__pb2
-import stream_pb2 as stream__pb2
-import web_pb2 as web__pb2
+from driver.protoc import driver_pb2 as driver__pb2
+from navigation.protoc import navigation_pb2 as navigation__pb2
+from stream.protoc import stream_pb2 as stream__pb2
+from web.protoc import web_pb2 as web__pb2
 
 GRPC_GENERATED_VERSION = '1.66.2'
 GRPC_VERSION = grpc.__version__
