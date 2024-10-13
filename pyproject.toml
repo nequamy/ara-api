@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "ara-api"
+version = "1.0.0"
+description = "Applied Robotics Avia API for ARA MINI, ARA EDU and ARA FPV drones"
+authors = ["Alexander Kleimenov <nequamy@gmail.com>"]
+license = "No"
+readme = "README.md"
+packages = [
+    { include = "navigation", from = "src/"},
+    { include = "driver", from = "src/"},
+    { include = "data", from = "src/"},
+    { include = "stream", from = "src/"},
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+grpcio = "^1.66.2"
+grpcio-tools = "^1.66.2"
+numpy = "^2.1.1"
+pyserial = "^3.5"
+colorama = "^0.4.6"
+pyfiglet = "^1.0.2"
+opencv-python = "^4.10.0.84"
+opencv-contrib-python = "^4.10.0.84"
+pytest = "^8.3.3"
+
+[tool.poetry.scripts]
+api = "src.main:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

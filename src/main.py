@@ -1,6 +1,6 @@
-from app import Api
-from lib.drone import ARA_mini
-from lib.stream import Stream
+from web.app import Api
+from navigation.drone import ARA_mini
+from stream.stream import Stream
 
 from threading import Thread
 import time

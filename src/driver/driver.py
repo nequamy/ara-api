@@ -12,7 +12,7 @@ import serial
 
 # from msp_codes import *
 
-from lib.transmitter import Transmitter
+from driver.transmitter import Transmitter
 
 if "linux" in sys.platform:
     import ctypes

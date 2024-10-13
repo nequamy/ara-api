@@ -1,8 +1,8 @@
-from lib.api_driver import MultirotorControl
-from lib.transmitter import UDPTransmitter, TCPTransmitter
-from lib.drone import Drone
-from lib.planner import Planner
-from lib.pid import PID
+from driver.driver import MultirotorControl
+from driver.transmitter import UDPTransmitter, TCPTransmitter
+from navigation.drone import Drone
+from navigation.navigation import Planner
+from navigation.pid import PID
 
 import numpy as np
 from math import atan2, sqrt, radians

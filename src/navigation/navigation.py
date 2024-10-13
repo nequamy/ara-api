@@ -1,7 +1,7 @@
 import math
 
-from lib.pid import PID
-from lib.drone import Drone
+from navigation.pid import PID
+from navigation.drone import Drone
 from data.attitude import Attitude
 
 import numpy as np
