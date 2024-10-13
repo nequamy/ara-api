@@ -334,12 +334,6 @@ class MultirotorControl:
             'optical_flow': [0, 0, 0, 0, 0]  # quality, flowRate[X], flowRate[Y], bodyRate[X], bodyRate[Y]
         }
 
-        self.ODOMETRY = {
-            'position': [0, 0, 0],
-            'velocity': [0, 0, 0],
-            'yaw': 0,
-        }
-
         self.MOTOR_DATA = [0] * 8
 
         # defaults

@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+import "driver.proto";
+
+service NavigationService {
+  // Задание скорости по x и y
+  rpc SetVelocity(VelocityRequest) returns (stream VelocityResponse) {}
+
+  // Задание целевой точки
+  rpc SetTargetPosition(PositionRequest) returns (stream PositionResponse) {}
+
+  // Задание целевой высоты
+  rpc SetTargetAltitude(AltitudeRequest) returns (stream AltitudeResponse) {}
+
+  // Взлет на определенную высоту
+  rpc Takeoff(TakeoffRequest) returns (stream TakeoffResponse) {}
+
+  // Посадка
+  rpc Land(LandRequest) returns (stream LandResponse) {}
+}
+
+// Запрос на задание скорости
+message VelocityRequest {
+  float velocity_x = 1;
+  float velocity_y = 2;
+}
+
+// Ответ с текущей скоростью
+message VelocityResponse {
+  float current_velocity_x = 1;
+  float current_velocity_y = 2;
+}
+
+// Запрос на задание целевой точки
+message PositionRequest {
+  float target_x = 1;
+  float target_y = 2;
+  float target_z = 3;
+  float target_yaw = 4;
+}
+
+// Ответ с текущей позицией
+message PositionResponse {
+  float current_x = 1;
+  float current_y = 2;
+  float current_z = 3;
+  float current_yaw = 4;
+}
+
+// Запрос на задание целевой высоты
+message AltitudeRequest {
+  float target_altitude = 1;
+}
+
+// Ответ с текущей высотой
+message AltitudeResponse {
+  float current_altitude = 1;
+}
+
+// Запрос на взлет
+message TakeoffRequest {
+  float target_altitude = 1;
+}
+
+// Ответ с состоянием взлета
+message TakeoffResponse {
+  bool is_flying = 1;
+  float current_altitude = 2;
+}
+
+// Запрос на посадку
+message LandRequest {
+}
+
+// Ответ с состоянием посадки
+message LandResponse {
+  bool is_landed = 1;
+  float current_altitude = 2;
+}

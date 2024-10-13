@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+service DriverService {
+  // Получение данных с различных датчиков
+  rpc GetSensorData(SensorDataRequest) returns (stream SensorDataResponse) {}
+
+  // Отправка данных пульта управления
+  rpc SendRCData(stream RCOutDataRequest) returns (RCOutDataResponse) {}
+}
+
+// Запрос на получение данных с датчиков
+message SensorDataRequest {
+  int32 request_id = 1;
+}
+
+// Ответ с данными с датчиков
+message SensorDataResponse {
+  int32 request_id = 1;
+  SensorData sensor_data = 2;
+}
+
+// Структура данных с различных датчиков
+message SensorData {
+  AnalogData analog = 1;
+  SensorFlags flags = 2;
+  RCInData rc_in = 3;
+  repeated SensorReading sensor_readings = 4;
+}
+
+// Данные аналогового датчика
+message AnalogData {
+  float battery_voltage = 1;
+  float battery_current = 2;
+}
+
+// Текущие флаги
+message SensorFlags {
+  bool armed = 1;
+  bool low_battery = 2;
+  bool gps_fix = 3;
+}
+
+// Данные с пульта управления
+message RCInData {
+  repeated float channels = 1;
+}
+
+// Показания датчиков
+message SensorReading {
+  string name = 1;
+  float value = 2;
+}
+
+// Данные для отправки на пульт управления
+message RCOutDataRequest {
+  repeated float channels = 1;
+}
+
+// Ответ на отправку данных на пульт управления
+message RCOutDataResponse {
+  bool success = 1;
+  string message = 2;
+}
