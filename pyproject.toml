@@ -10,6 +10,7 @@ packages = [
     { include = "driver", from = "src/"},
     { include = "data", from = "src/"},
     { include = "stream", from = "src/"},
+    { include = "protoc", from = "src/"},
 ]
 
 [tool.poetry.dependencies]
@@ -26,6 +27,8 @@ pytest = "^8.3.3"
 
 [tool.poetry.scripts]
 api = "src.main:main"
+test_driver = "src.driver.test:serve"
+test_nav = "src.navigation.test:run"
 
 [build-system]
 requires = ["poetry-core"]

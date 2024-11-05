@@ -2307,32 +2307,6 @@ class MultirotorControl:
     def process_MSP_SET_BLACKBOX_CONFIG(self, data):
         logging.info("Blackbox config saved")
 
-    # TODO: This changed and it will need to check the BF version to decode things correctly
-    # def process_MSP_TRANSPONDER_CONFIG(self, data):
-    #     bytesRemaining = len(data)
-
-    #     providerCount = self.readbytes(data, size=8, unsigned=True)
-    #     bytesRemaining-=1
-
-    #     self.TRANSPONDER['supported'] = providerCount > 0
-    #     self.TRANSPONDER['providers'] = []
-
-    #     for i in range(providerCount):
-    #         provider = {
-    #             'id': self.readbytes(data, size=8, unsigned=True),
-    #             'dataLength': self.readbytes(data, size=8, unsigned=True)
-    #         }
-    #         bytesRemaining -= 2
-
-    #         self.TRANSPONDER['providers'].append(provider)
-
-    #     self.TRANSPONDER['provider'] = self.readbytes(data, size=8, unsigned=True)
-    #     bytesRemaining-=1
-
-    #     self.TRANSPONDER['data'] = []
-    #     for i in range(bytesRemaining):
-    #         self.TRANSPONDER['data'].append(self.readbytes(data, size=8, unsigned=True))
-
     def process_MSP_SET_TRANSPONDER_CONFIG(self, data):
         logging.info("Transponder config saved")
 

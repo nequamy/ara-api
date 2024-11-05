@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+service DriverManager {
+    rpc GetSensorDataRPC (GetRequest) returns (stream SensorData);
+}
+
+message SensorData {
+    IMUData imu = 1;
+    AttitudeData att = 2;
+    OdometryData odom = 3;
+    AnalogData analog = 4;
+}
+
+message BasicInfoData {
+
+}
+
+message MotorData {
+
+}
+
+
+message IMUData {
+    Vector3 gyro = 1;
+    Vector3 acc = 2; 
+}
+
+message AttitudeData {
+    Vector3 ang = 1;
+}
+
+message AltitudeData {
+    float altitude = 1;
+}
+
+message SonarData {
+    float sonar = 1;
+}
+
+message OpticalFlowData {
+    int32 quality = 1;
+    float flow_rate_x = 2;
+    float flow_rate_y = 3;
+    float body_rate_x = 4;
+    float body_rate_y = 5;
+}
+
+message OdometryData {
+    Vector3 pos = 1;
+    Vector3 vel = 2;
+    float yaw = 3;
+}
+
+message AnalogData {
+    float voltage = 1;
+    int32 mAhdrawn = 2;
+    int32 rssi = 3;
+    float amperage = 4;
+}
+
+message GetRequest {
+    string req = 1;
+}
+
+message Vector3 {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
