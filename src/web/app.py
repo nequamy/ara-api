@@ -1,321 +1,128 @@
-from driver.driver import MultirotorControl
-from driver.transmitter import UDPTransmitter, TCPTransmitter
-from navigation.drone import Drone
-from navigation.navigation import Planner
-from navigation.pid import PID
-
-import numpy as np
-from math import atan2, sqrt, radians
+import threading
 from threading import Thread
+
+import grpc
+import asyncio
+import dash
+from dash import dcc
+from dash import html
+import dash.dependencies as dd
+import dash_bootstrap_components as dbc
+import protos.api_pb2 as api_pb2
+import protos.api_pb2_grpc as api_pb2_grpc
 import time
 
-import colorama
-from colorama import Fore
-import pyfiglet
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-from data.altitude import Altitude
-from data.attitude import Attitude
-from data.barometer import Barometer
-from data.battery import Battery
-from data.channels import Channels
-from data.flags import Flags
-from data.odom import Odometry
-from data.imu import Imu
+# Изменяемая переменная для хранения данных сенсоров
+sensor_data_list = []
+
+app.layout = html.Div(
+    [
+        dcc.Graph(id='gyro-data-graph'),
+        dcc.Graph(id='accelerometer-data-graph'),
+        dcc.Interval(
+            id='interval-component',
+            interval=50,
+            n_intervals=0
+        ),
+    ]
+)
 
 
-class Api(object):
-    def __init__(self, ip: str, port: int, drone: Drone):
+@app.callback(
+    [dd.Output('gyro-data-graph', 'figure'),
+     dd.Output('accelerometer-data-graph', 'figure')],
+    [dd.Input('interval-component', 'n_intervals')]
+)
+def update_graph(n):
+    # Копируем последние 200 данных, если их больше 200
+    last_data = sensor_data_list[-200:] if len(sensor_data_list) > 200 else sensor_data_list
 
-        colorama.init()
+    if len(last_data) == 0:
+        return {'data': [], 'layout': {'title': 'Нет данных'}}
 
-        ascii_art = pyfiglet.figlet_format("ARA MINI API v1", font="slant", width=50)
-        summary = ("Поздравляем! Вы запустили API для программирования ARA MINI\n\n"
-                   "Для подключения в конфигуратеоре:\n"
-                   "\tUDP: \thttp://192.168.2.1:14550\n"
-                   "\tTCP: \thttp://192.168.2.1:5760\n\n"
-                   "Изображение с камеры: \t\thttp://192.168.2.113:81/stream\n")
-        print(Fore.BLUE + ascii_art)
-        print("=" * 60)
-        print(Fore.CYAN + summary)
+    # Получаем данные для заполнения графика
+    x_values = list(range(len(last_data)))
+    gyro_x = [data.imu.gyro.x for data in last_data]
+    gyro_y = [data.imu.gyro.y for data in last_data]
+    gyro_z = [data.imu.gyro.z for data in last_data]
 
-        print(Fore.RED + "Data output:")
-        print(Fore.MAGENTA)
-        colorama.deinit()
+    acc_x = [data.imu.acc.x for data in last_data]
+    acc_y = [data.imu.acc.y for data in last_data]
+    acc_z = [data.imu.acc.z for data in last_data]
 
-        self.connector = TCPTransmitter((ip, port))
-        self.driver = MultirotorControl(self.connector)
-        self.driver.connect()
+    # Создаём график
+    gyro_figure = {
+        'data': [
+            {'x': x_values, 'y': gyro_x, 'type': 'line', 'name': 'Гироскоп X'},
+            {'x': x_values, 'y': gyro_y, 'type': 'line', 'name': 'Гироскоп Y'},
+            {'x': x_values, 'y': gyro_z, 'type': 'line', 'name': 'Гироскоп Z'},
+        ],
+        'layout': {'title': 'Данные гироскопа'}
+    }
 
-        self.drone = drone
-        self.drone_planner = Planner(drone)
-
-        self.attitude = Attitude()
-        self.battery = Battery()
-        self.channels = Channels()
-        self.rc_out = Channels()
-        self.odom = {
-            'position': [0, 0, 0],
-            'velocity': [0, 0, 0],
-            'yaw': 0,
+    accelerometer_figure = {
+        'data': [
+            {'x': x_values, 'y': acc_x, 'type': 'line', 'name': 'Акселерометр X'},
+            {'x': x_values, 'y': acc_y, 'type': 'line', 'name': 'Акселерометр Y'},
+            {'x': x_values, 'y': acc_z, 'type': 'line', 'name': 'Акселерометр Z'},
+        ],
+        'layout': {
+            'title': 'Accelerometer Data',
+            'xaxis': {'title': 'Time'},
+            'yaxis': {'title': 'Value'},
+            'showlegend': True
         }
-        self.odom_zero = {
-            'position': [0, 0, 0],
-            'velocity': [0, 0, 0],
-            'yaw': 0,
-        }
-        self.imu = Imu()
+    }
 
-        self.is_armed = False
-        self.airmode = False
+    return gyro_figure, accelerometer_figure
 
-        self.arm_state = 0
-        self.nav_state = 0
 
-        self.roll_acc = 0
-        self.pitch_acc = 0
-        self.roll_rate = 0
-        self.pitch_rate = 0
-        self.roll = 0
-        self.pitch = 0
-        self.yaw = 0
+async def grpc_client():
+    try:
+        # Устанавливаем подключение к серверу
+        async with grpc.aio.insecure_channel('localhost:50051') as channel:
+            stub = api_pb2_grpc.DriverManagerStub(channel)
+            request = api_pb2.GetRequest()
 
-        self.ang_x = 0
-        self.ang_y = 0
-        self.ang_z = 0
-        self.ang_x_zero = 0
-        self.ang_y_zero = 0
-        self.ang_z_zero = 0
+            # Получаем поток данных от сервера
+            async for sensor_data in stub.GetSensorDataRPC(request):
+                print(f"Received IMU Data: Gyro: ({sensor_data.imu.gyro.x}, "
+                      f"{sensor_data.imu.gyro.y}, {sensor_data.imu.gyro.z}), "
+                      f"Accel: ({sensor_data.imu.acc.x}, "
+                      f"{sensor_data.imu.acc.y}, {sensor_data.imu.acc.z})")
 
-        self.odom_zero_flag = True
-        self.att_zero_flag = True
+                # Добавляем данные в список
+                sensor_data_list.append(sensor_data)
 
-        self.alt_pid = PID(5, 3, 3)
+                # Ограничиваем длину списка, если нужно
+                if len(sensor_data_list) > 100:  # например, храним только последние 100 данных
+                    sensor_data_list.pop(0)
 
-        self.dt = 0.1
+            sensor_stream = stub.GetSensorDataRPC(request)
+            while True:
+                response = await sensor_stream.read()
+                if response == grpc.aio.EOF:
+                    break
+                print(
+                    "Greeter client received from direct read: " + response.message
+                )
+    except grpc.RpcError as e:
+        print(f"RPC Error: {e}")
+        print("Пытаемся переподключиться...")
+        await asyncio.sleep(2)  # Ждем немного перед следующей попыткой
+    except KeyboardInterrupt:
+        print("Клиент завершает работу.")
 
-        self.Kp = 0.5
-        self.Ki = 0.1
 
-        self.time_delay = 0.5
+def start_grpc_client():
+    asyncio.run(grpc_client())
 
-    def update_loop(self) -> None:
-        while True:
-            self.update_data()
+if __name__ == '__main__':
+    # Запускаем gRPC клиент в отдельном потоке
+    grpc_thread = threading.Thread(target=start_grpc_client, daemon=True)
+    grpc_thread.start()
 
-            self.load_data()
-
-            time.sleep(0.05)
-
-    def update_data(self) -> None:
-        self.driver.basic_info()
-        self.driver.msp_read_sensor_data()
-        self.driver.msp_read_rc_channels_data()
-        # self.driver.msp_read_box_data()
-        self.update_imu()
-        # self.update_attitude()
-        # self.update_rc_in()
-        # self.update_odometry()
-        # self.drone_planner.set_attitude(self.attitude)
-        # self.drone_planner.set_odom(self.odom)
-
-    def load_data(self) -> None:
-        self.rc_out.channels[0] = self.drone_planner.roll_corrected
-        self.rc_out.channels[1] = self.drone_planner.pitch_corrected
-        self.rc_out.channels[2] = self.drone_planner.throttle
-        self.rc_out.channels[3] = 1500
-        self.rc_out.channels[4] = (self.arm_state * 1000) + 1000
-        self.rc_out.channels[6] = (self.nav_state * 500) + 1000
-
-        # print(f"RC:\t{self.rc_out.channels[0:8]}\nOdom:\n\tX - \t{self.odom['position'][0]}\n\tY - \t{self.odom['position'][1]}\n\tZ - \t{self.odom['position'][2]}\n"
-        #       f"Angle X:\t{self.attitude.body_rate.x}\nAngle Y:\t{self.attitude.body_rate.y}\nAngle Z:\t{self.attitude.body_rate.z}\n")
-
-        self.cmd_send()
-
-    def update_imu(self):
-        """
-        Function for publishing accelerometer, gyroscope and drone orientation values
-
-        publish: sensor_msgs/Imu
-        """
-        self.imu.linear_acceleration.x = self.driver.SENSOR_DATA['accelerometer'][0]
-        self.imu.linear_acceleration.y = self.driver.SENSOR_DATA['accelerometer'][1]
-        self.imu.linear_acceleration.z = self.driver.SENSOR_DATA['accelerometer'][2]
-
-        self.imu.angular_velocity.x = self.driver.SENSOR_DATA['gyroscope'][0]
-        self.imu.angular_velocity.y = self.driver.SENSOR_DATA['gyroscope'][1]
-        self.imu.angular_velocity.z = self.driver.SENSOR_DATA['gyroscope'][2]
-
-        print(self.driver.SENSOR_DATA['optical_flow'])
-
-    def update_altitude(self):
-        """
-        Function for publishing altitude values from barometer and rangefinder from FC
-
-        publish: eagle_eye_msgs/Altitude
-        """
-
-        self.altitude.monotonic = self.driver.SENSOR_DATA['altitude']
-        self.altitude.relative = float(self.driver.SENSOR_DATA['sonar'])
-        self.barometer.altitude = float(self.driver.SENSOR_DATA['sonar'])
-
-    def update_odometry(self):
-        """
-        Function for publishing optical flow values.
-
-        publish: eagle_eye_msgs/OpticalFlow
-        """
-        self.odom = self.driver.SENSOR_DATA['odom']
-
-        if self.odom_zero_flag:
-            self.odom_zero['position'][0] = self.odom['position'][0]
-            self.odom_zero['position'][1] = self.odom['position'][1]
-            self.odom_zero['position'][2] = self.odom['position'][2]
-            self.odom_zero['yaw'] = self.odom['yaw']
-            self.odom_zero_flag = False
-
-        self.odom['position'][0] = -round(self.odom['position'][0] - self.odom_zero['position'][0], 2)
-        self.odom['position'][1] = round(self.odom['position'][1] - self.odom_zero['position'][1], 2)
-        self.odom['position'][2] = round(self.odom['position'][2] - self.odom_zero['position'][2], 2)
-        self.odom['yaw'] = self.odom['yaw'] - self.odom_zero['yaw']
-
-    def update_attitude(self):
-        """
-        Function for publishing more accurate orientation
-        based on complementary filter from FC (heading)
-
-        publish: eagle_eye_msgs/Attitude
-        """
-
-        if self.att_zero_flag:
-            self.ang_x_zero = radians(self.driver.SENSOR_DATA['kinematics'][0])
-            self.ang_y_zero = radians(self.driver.SENSOR_DATA['kinematics'][1])
-            self.ang_z_zero = radians(self.driver.SENSOR_DATA['kinematics'][2])
-            self.drone_planner.set_ang_zero(self.ang_z_zero)
-            self.att_zero_flag = False
-
-        self.ang_x = radians(self.driver.SENSOR_DATA['kinematics'][0]) - self.ang_x_zero
-        self.ang_y = radians(self.driver.SENSOR_DATA['kinematics'][1]) - self.ang_y_zero
-        self.ang_z = radians(self.driver.SENSOR_DATA['kinematics'][2]) - self.ang_z_zero
-
-        self.attitude.body_rate.x = self.ang_x
-        self.attitude.body_rate.y = self.ang_y
-        self.attitude.body_rate.z = self.ang_z
-
-    def update_basic(self):
-        """
-        Function for publishing information about flags inside FC
-
-        int32 cycle_time - time of one FC iteration; \n
-        int32 cpuload - FC CPU load (in percent); \n
-        int32 arming_disable_count - disable count of arming; \n
-
-        string[] arming_disable_flags - flags of internal FC errors; \n
-        string[] active_sensors - enabled sensors (not only working ones); \n
-        string[] mode - current modes of the flyer. \n
-
-        publish: eagle_eye_msgs/Flags
-        """
-
-        self.flags.cycle_time = self.driver.CONFIG['cycleTime']
-        self.flags.arming_disable_count = self.driver.CONFIG['armingDisableCount']
-
-        self.flags.arming_disable_flags = self.finder(self.driver.CONFIG['armingDisableFlags'],
-                                                      self.driver.armingCheckFlags_INAV)
-        self.flags.active_sensors = self.finder(self.driver.CONFIG['activeSensors'],
-                                                self.driver.sensorsCheckFlags_INAV)
-        self.flags.mode = self.finder(int(self.driver.CONFIG['mode'] / 8),
-                                      self.driver.modesCheckFlags_INAV)
-
-    def update_rc_in(self):
-        """
-        Function for reading RC channels coming from the remote driver unit
-
-        publish: eagle_eye_msgs/Channels
-        """
-        self.driver.fast_read_rc_channels()
-        self.channels.channels = self.driver.RC['channels']
-
-    def cmd_send(self):
-        """
-        Function for sending values on RC channels to FC via MSP protocol
-
-        publish: eagle_eye_msgs/Channels
-        """
-        self.driver.fast_msp_rc_cmd(self.rc_out.channels)
-
-    def set_arm_state(self, state: bool = 0) -> bool:
-        self.arm_state = int(state)
-        return True
-
-    def set_nav_state(self, state: int = 0) -> bool:
-        if state > 2:
-            print("ERR: invalid navigation state value")
-            return False
-
-        self.nav_state = state
-        return True
-
-    def set_velocity_throttle(self, throttle: int | float = 0) -> bool:
-        return self.drone_planner.set_throttle(throttle)
-
-    def set_velocity_x(self, x_vel: int | float = 0) -> bool:
-        return self.drone_planner.set_vel_x(x_vel)
-
-    def set_velocity_y(self, y_vel: int | float = 0) -> bool:
-        return self.drone_planner.set_vel_y(y_vel)
-
-    def takeoff(self, altitude: int | float = None) -> bool:
-        if altitude is None:
-            print("ERR: set altitude for takeoff method")
-            self.reset_state()
-            return False
-
-        if self.drone.max_altitude < altitude:
-            print("ERR: out of bounds altitude")
-            self.reset_state()
-            return False
-
-        self.drone_planner.set_point(altitude=altitude)
-
-        if self.drone_planner.takeoff():
-            return True
-        else:
-            self.reset_state()
-            return False
-
-    def land(self, auto_disarm: bool = 0) -> bool:
-        self.drone_planner.set_point(altitude=0)
-
-        if self.drone_planner.land():
-            self.arm_state = not auto_disarm
-            return True
-        else:
-            self.reset_state()
-            return False
-
-    def go_to_xy(self, x: float = None, y: float = None,
-                 yaw: int = None, auto_land: bool = False) -> bool:
-        self.drone_planner.set_point(x=x, y=y, yaw=yaw)
-
-        while not self.drone_planner.check_desired_position():
-            self.drone_planner.compute()
-
-        self.drone_planner.roll_corrected = 1500
-        self.drone_planner.pitch_corrected = 1500
-
-        time.sleep(5)
-
-        if auto_land:
-            self.land(auto_disarm=True)
-
-        return True
-
-    def reset_state(self):
-        self.arm_state = 0
-        self.nav_state = 0
-
-    def check_desired_alt(self, altitude: float = 0) -> bool:
-        if altitude - 0.05 < self.odom['position'][2] < altitude + 0.05:
-            return True
-        else:
-            return False
+    # Запускаем сервер Dash
+    app.run_server(debug=True)
