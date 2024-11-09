@@ -1,24 +1,68 @@
 syntax = "proto3";
 
 service DriverManager {
-    rpc GetSensorDataRPC (GetRequest) returns (stream SensorData);
+    rpc GetImuDataRPC (GetRequest) returns (stream IMUData);
+    rpc GetSonarDataRPC (GetRequest) returns (stream SonarData);
+    rpc GetAnalogDataRPC (GetRequest) returns (stream AnalogData);
+    rpc GetAttitudeDataRPC (GetRequest) returns (stream AttitudeData);
+    rpc GetOdometryDataRPC (GetRequest) returns (stream OdometryData);
+    rpc GetOpticalFlowDataRPC (GetRequest) returns (stream OpticalFlowData);
+    rpc GetFlagsDataRPC (GetRequest) returns (stream FlagsData);
+
+    rpc SendRcDataRPC (stream RcDataData) returns (stream StatusData);
 }
 
-message SensorData {
-    IMUData imu = 1;
-    AttitudeData att = 2;
-    OdometryData odom = 3;
-    AnalogData analog = 4;
+service NavigationManager {
+    rpc TakeOFF (CommandData) returns (StatusData);
+    rpc Land (CommandData) returns (StatusData);
+    rpc Move (PointData) returns (StatusData);
+    rpc SetVelocity (VelocityData) returns (StatusData);
+    rpc SetSettings (SettingsData) returns (StatusData);
 }
 
-message BasicInfoData {
+message CommandData{
+    string cmd = 1;
+}
 
+message StatusData {
+    string status = 1;
+}
+
+message PointData{
+    Vector3 point = 1;
+}
+
+message VelocityData{
+    Vector3 velocity = 1;
+}
+
+message SettingsData{
+    string settings = 1;
+}
+
+message RcDataData {
+    uint32 ail = 1; // roll
+    uint32 ele = 2; // pitch
+    uint32 thr = 3; // throttle
+    uint32 rud = 4; // yaw
+    uint32 aux_1 = 5;
+    uint32 aux_2 = 6;
+    uint32 aux_3 = 7;
+    uint32 aux_4 = 8;
+}
+
+message FlagsData {
+    string activeSensors = 1;
+    string armingDIsableFlags = 2;
+    string mode = 3;
 }
 
 message MotorData {
-
+    int32 motor_1 = 1;
+    int32 motor_2 = 2;
+    int32 motor_3 = 3;
+    int32 motor_4 = 4;
 }
-
 
 message IMUData {
     Vector3 gyro = 1;
@@ -26,7 +70,7 @@ message IMUData {
 }
 
 message AttitudeData {
-    Vector3 ang = 1;
+    Vector3 orient = 1;
 }
 
 message AltitudeData {
