@@ -1,9 +1,5 @@
-from web.app import Api
-from navigation.drone import ARA_mini
-from stream.stream import Stream
-
-from threading import Thread
-import time
+from tmp.app import Api
+from navigation.utils.nav_drone_config import ARA_mini
 
 """
 Список методов API:

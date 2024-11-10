@@ -87,7 +87,7 @@ async def grpc_client():
             request = api_pb2.GetRequest()
 
             # Получаем поток данных от сервера
-            async for sensor_data in stub.GetSensorDataRPC(request):
+            async for sensor_data in stub.GetDataRPC(request):
                 print(f"Received IMU Data: Gyro: ({sensor_data.imu.gyro.x}, "
                       f"{sensor_data.imu.gyro.y}, {sensor_data.imu.gyro.z}), "
                       f"Accel: ({sensor_data.imu.acc.x}, "

@@ -1,12 +1,8 @@
-import math
-
-from driver.protoc import driver_pb2, driver_pb2_grpc
-from navigation.pid import PID
-from navigation.drone import Drone
-from data.attitude import Attitude
+from navigation.utils.pid import PID
+from navigation.utils.nav_drone_config import Drone
 
 import numpy as np
-from math import e, sin, cos, atan, pi, radians
+from math import e, sin, cos, pi, radians
 import time
 
 
@@ -46,7 +42,6 @@ class Planner():
         self.upper_threshold = 2000
         self.lower_threshold = 1000
 
-        self.orient = Attitude
 
         self.time_delay = 0.4
 

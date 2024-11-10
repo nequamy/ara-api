@@ -35,7 +35,6 @@ class MultirotorControl:
     JUMBO_FRAME_SIZE_LIMIT = 255
 
     def __init__(self, transmitter: Transmitter):
-
         self.transmitter = transmitter
 
         self.dataHandler_init = {
@@ -638,37 +637,26 @@ class MultirotorControl:
         self.INAV = True
 
     def __enter__(self):
-
         self.is_transmitter_open = self.connect()
-
         if self.is_transmitter_open is True:
             return self
-
         else:
             return 1
 
     def __exit__(self):
-
         if self.transmitter.is_connect is True:
             self.transmitter.disconnect()
-
             logging.info("Transmitter is closed")
 
     def connect(self, trials=100, delay=1) -> bool:
-
         for _ in range(trials):
-
             try:
                 self.transmitter.connect()
-                # self.basic_info()
-
+                self.basic_info()
                 return True
-
             except:
                 logging.error("Transmitter cant connect to serial/port")
-
             time.sleep(delay)
-
         return False
 
     def basic_info(self):
@@ -693,26 +681,48 @@ class MultirotorControl:
                 dataHandler = self.receive_msg()
                 self.process_recv_data(dataHandler)
 
-    def msp_read_sensor_data(self):
+    def msp_read_imu_data(self):
         if self.send_RAW_msg(self.MSPCodes["MSP_RAW_IMU"]):
             data_handler = self.receive_msg()
             self.process_recv_data(data_handler)
-        if self.send_RAW_msg(self.MSPCodes["MSP_ATTITUDE"]):
-            data_handler = self.receive_msg()
-            self.process_recv_data(data_handler)
-        if self.send_RAW_msg(self.MSPCodes["MSP_DEBUG"]):
-            data_handler = self.receive_msg()
-            self.process_recv_data(data_handler)
-        if self.send_RAW_msg(self.MSPCodes["MSP_ALTITUDE"]):
-            data_handler = self.receive_msg()
-            self.process_recv_data(data_handler)
+
+    def msp_read_sonar_data(self):
         if self.send_RAW_msg(self.MSPCodes["MSP_SONAR"]):
             data_handler = self.receive_msg()
             self.process_recv_data(data_handler)
+
+    def msp_read_attitude_data(self):
+        if self.send_RAW_msg(self.MSPCodes["MSP_ATTITUDE"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
+
+    def msp_read_debug_data(self):
+        if self.send_RAW_msg(self.MSPCodes["MSP_DEBUG"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
+
+    def msp_read_altitude_data(self):
+        if self.send_RAW_msg(self.MSPCodes["MSP_ALTITUDE"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
+
+    def msp_read_odom_data(self):
         if self.send_RAW_msg(self.MSPCodes["MSP_ODOM"]):
             data_handler = self.receive_msg()
             self.process_recv_data(data_handler)
+
+    def msp_read_optical_flow_data(self):
         if self.send_RAW_msg(self.MSPCodes["MSPV2_INAV_OPTICAL_FLOW"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
+
+    def msp_read_flags_data(self):
+        if self.send_RAW_msg(self.MSPCodes["MSP_STATUS_EX"]):
+            data_handler = self.receive_msg()
+            self.process_recv_data(data_handler)
+
+    def msp_read_analog_data(self):
+        if self.send_RAW_msg(self.MSPCodes["MSPV2_INAV_ANALOG"]):
             data_handler = self.receive_msg()
             self.process_recv_data(data_handler)
 
@@ -731,7 +741,7 @@ class MultirotorControl:
             data_handler = self.receive_msg()
             self.process_MSP_BOXNAMES(data_handler)
 
-    def fast_msp_rc_cmd(self, cmds):
+    def msp_send_rc_cmd(self, cmds):
         cmds = [int(cmd) for cmd in cmds]
         data = struct.pack('<%dH' % len(cmds), *cmds)
 
@@ -739,13 +749,10 @@ class MultirotorControl:
             _ = self.receive_raw_msg(size=6)
 
     def receive_raw_msg(self, size, timeout=10):
-
         msg_header, msg = self.transmitter.receive(size, timeout)
-
         return msg_header + msg
 
     def receive_msg(self):
-
         dataHandler = self.dataHandler_init.copy()
         received_bytes = self.receive_raw_msg(3)
         dataHandler['last_received_timestamp'] = time.time()
@@ -763,7 +770,6 @@ class MultirotorControl:
                                                                           dataHandler['state'],
                                                                           data))
                 except IndexError:
-
                     logging.debug('IndexError detected on state: {}'.format(dataHandler['state']))
                     dataHandler['state'] = -1
                     break  # Sends it to the error state
@@ -771,7 +777,6 @@ class MultirotorControl:
                 if dataHandler['state'] == 0:  # sync char 1
                     if (data == 36):  # $ - a new MSP message begins with $
                         dataHandler['state'] = 1
-
                 elif dataHandler['state'] == 1:  # sync char 2
                     if (data == 77):  # M - followed by an M => MSP V1
                         dataHandler['msp_version'] = 1
@@ -782,7 +787,6 @@ class MultirotorControl:
                     else:  # something went wrong, no M received...
                         logging.debug('Something went wrong, no M received.')
                         break  # sends it to the error state
-
                 elif dataHandler['state'] == 2:  # direction (should be >)
                     dataHandler['unsupported'] = 0
                     if (data == 33):  # !
@@ -802,19 +806,15 @@ class MultirotorControl:
                         elif dataHandler['msp_version'] == 2:
                             dataHandler['state'] = 2.1
                             received_bytes += local_read(5)
-
                 elif dataHandler['state'] == 2.1:  # MSP V2: flag (ignored)
                     dataHandler['flags'] = data  # 4th byte
                     dataHandler['state'] = 2.2
-
                 elif dataHandler['state'] == 2.2:  # MSP V2: code LOW
                     dataHandler['code'] = data
                     dataHandler['state'] = 2.3
-
                 elif dataHandler['state'] == 2.3:  # MSP V2: code HIGH
                     dataHandler['code'] |= data << 8
                     dataHandler['state'] = 3.1
-
                 elif dataHandler['state'] == 3:
                     dataHandler['message_length_expected'] = data  # 4th byte
                     if dataHandler['message_length_expected'] == MultirotorControl.JUMBO_FRAME_SIZE_LIMIT:
@@ -824,11 +824,9 @@ class MultirotorControl:
                     # start the checksum procedure
                     dataHandler['message_checksum'] = data
                     dataHandler['state'] = 4
-
                 elif dataHandler['state'] == 3.1:  # MSP V2: msg length LOW
                     dataHandler['message_length_expected'] = data
                     dataHandler['state'] = 3.2
-
                 elif dataHandler['state'] == 3.2:  # MSP V2: msg length HIGH
                     dataHandler['message_length_expected'] |= data << 8
                     # setup buffer according to the message_length_expected
@@ -840,11 +838,9 @@ class MultirotorControl:
                     else:
                         dataHandler['state'] = 9
                         received_bytes += local_read(2)  # 2 for CRC
-
                 elif dataHandler['state'] == 4:
                     dataHandler['code'] = data
                     dataHandler['message_checksum'] ^= data
-
                     if dataHandler['message_length_expected'] > 0:
                         # process payload
                         if dataHandler['messageIsJumboFrame']:
@@ -857,7 +853,6 @@ class MultirotorControl:
                         # no payload
                         dataHandler['state'] = 9
                         received_bytes += local_read()
-
                 elif dataHandler['state'] == 5:
                     # this is a JumboFrame
                     dataHandler['message_length_expected'] = data
@@ -866,7 +861,6 @@ class MultirotorControl:
 
                     dataHandler['state'] = 6
                     received_bytes += local_read()
-
                 elif dataHandler['state'] == 6:
                     # calculates the JumboFrame size
                     dataHandler['message_length_expected'] += 256 * data
@@ -879,7 +873,6 @@ class MultirotorControl:
 
                     dataHandler['state'] = 7
                     received_bytes += local_read(dataHandler['message_length_expected'] + 1)  # +1 for CRC
-
                 elif dataHandler['state'] == 7:
                     # setup buffer according to the message_length_expected
                     dataHandler['message_buffer'] = bytearray(dataHandler['message_length_expected'])
@@ -895,7 +888,6 @@ class MultirotorControl:
                         dataHandler['state'] = 9
                     else:
                         dataHandler['state'] = 8
-
                 elif dataHandler['state'] == 8:
                     # payload
                     dataHandler['message_buffer_uint8_view'][dataHandler['message_length_received']] = data
@@ -904,7 +896,6 @@ class MultirotorControl:
 
                     if dataHandler['message_length_received'] == dataHandler['message_length_expected']:
                         dataHandler['state'] = 9
-
                 elif dataHandler['state'] == 9:
                     if dataHandler['msp_version'] == 1:
                         if dataHandler['message_checksum'] == data:
@@ -956,7 +947,6 @@ class MultirotorControl:
                                                                                                    'message_checksum']))
                             dataHandler['crcError'] = True
                             break  # sends it to the error state
-
             # it means an error occurred
             logging.debug('Error detected on state: {}'.format(dataHandler['state']))
             dataHandler['packet_error'] = 1
@@ -965,7 +955,6 @@ class MultirotorControl:
 
     @staticmethod
     def readbytes(data, size=8, unsigned=False, read_as_float=False):
-
         buffer = bytearray()
 
         for _ in range(int(size / 8)):
@@ -1001,7 +990,6 @@ class MultirotorControl:
         return result
 
     def process_mode(self, flag):
-
         result = []
         for i in range(len(self.AUX_CONFIG)):
             if (self.bit_check(flag, i)):
@@ -1025,8 +1013,8 @@ class MultirotorControl:
 
     @staticmethod
     def convert(val_list, n=16):
-
         buffer = []
+
         for val in val_list:
             for i in range(int(n / 8)):
                 buffer.append((int(val) >> i * 8) & 255)
@@ -1041,7 +1029,6 @@ class MultirotorControl:
         return self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_SET_REBOOT'], data=[])
 
     def set_ARMING_DISABLE(self, armingDisabled=0, runawayTakeoffPreventionDisabled=0):
-
         data = bytearray([armingDisabled, runawayTakeoffPreventionDisabled])
         return self.send_RAW_msg(MultirotorControl.MSPCodes['MSP_ARMING_DISABLE'], data)
 
@@ -1619,54 +1606,6 @@ class MultirotorControl:
 
     # def process_MSP_DISPLAYPORT(self, data):
 
-    def process_MSP_SET_RAW_RC(self, data):
-        logging.debug('RAW RC values updated')
-
-    def process_MSP_SET_PID(self, data):
-        logging.info('PID settings saved')
-
-    def process_MSP_SET_RC_TUNING(self, data):
-        logging.info('RC Tuning saved')
-
-    def process_MSP_ACC_CALIBRATION(self, data):
-        logging.info('Accel calibration executed')
-
-    def process_MSP_MAG_CALIBRATION(self, data):
-        logging.info('Mag calibration executed')
-
-    def process_MSP_SET_MOTOR_CONFIG(self, data):
-        logging.info('Motor Configuration saved')
-
-    def process_MSP_SET_GPS_CONFIG(self, data):
-        logging.info('GPS Configuration saved')
-
-    def process_MSP_SET_RSSI_CONFIG(self, data):
-        logging.info('RSSI Configuration saved')
-
-    def process_MSP_SET_FEATURE_CONFIG(self, data):
-        logging.info('Features saved')
-
-    def process_MSP_SET_BEEPER_CONFIG(self, data):
-        logging.info('Beeper Configuration saved')
-
-    def process_MSP_RESET_CONF(self, data):
-        logging.info('Settings Reset')
-
-    def process_MSP_SELECT_SETTING(self, data):
-        logging.info('Profile selected')
-
-    def process_MSP_SET_SERVO_CONFIGURATION(self, data):
-        logging.info('Servo Configuration saved')
-
-    def process_MSP_EEPROM_WRITE(self, data):
-        logging.info('Settings Saved in EEPROM')
-
-    def process_MSP_SET_CURRENT_METER_CONFIG(self, data):
-        logging.info('Amperage Settings saved')
-
-    def process_MSP_SET_VOLTAGE_METER_CONFIG(self, data):
-        logging.info('Voltage config saved')
-
     def process_MSP_DEBUG(self, data):
         for i in range(4):
             self.SENSOR_DATA['debug'][i] = self.readbytes(data, size=16, unsigned=False)
@@ -1819,9 +1758,6 @@ class MultirotorControl:
             char = self.readbytes(data, size=8, unsigned=True)
             self.CONFIG['name'] += chr(char)
 
-    # def process_MSP_SET_CHANNEL_FORWARDING(self, data):
-    #     logging.info('Channel forwarding saved')
-
     def process_MSP_CF_SERIAL_CONFIG(self, data):
         self.SERIAL_CONFIG['ports'] = []
         bytesPerPort = 1 + 2 + (1 * 4)
@@ -1838,9 +1774,6 @@ class MultirotorControl:
             }
 
             self.SERIAL_CONFIG['ports'].append(serialPort)
-
-    def process_MSP_SET_CF_SERIAL_CONFIG(self, data):
-        logging.info('Serial config saved')
 
     def process_MSP_MODE_RANGES(self, data):
         self.MODE_RANGES = []  # empty the array as new data is coming in
@@ -1986,9 +1919,6 @@ class MultirotorControl:
             self.FILTER_CONFIG['accNotchCutoff'] = self.readbytes(data, size=16, unsigned=True)
             self.FILTER_CONFIG['gyroStage2LowpassHz'] = self.readbytes(data, size=16, unsigned=True)
 
-    def process_MSP_SET_PID_ADVANCED(self, data):
-        logging.info("Advanced PID settings saved")
-
     def process_MSP_PID_ADVANCED(self, data):
         self.ADVANCED_TUNING['rollPitchItermIgnoreRate'] = self.readbytes(data, size=16, unsigned=True)
         self.ADVANCED_TUNING['yawItermIgnoreRate'] = self.readbytes(data, size=16, unsigned=True)
@@ -2058,9 +1988,6 @@ class MultirotorControl:
         self.DATAFLASH['usedSize'] = self.readbytes(data, size=32, unsigned=True)
         # update_dataflash_global();
 
-    def process_MSP_DATAFLASH_ERASE(self, data):
-        logging.info("Data flash erase begun...")
-
     def process_MSP_SDCARD_SUMMARY(self, data):
         flags = self.readbytes(data, size=8, unsigned=True)
 
@@ -2080,6 +2007,63 @@ class MultirotorControl:
             self.BLACKBOX['blackboxPDenom'] = self.readbytes(data, size=16, unsigned=True)
         else:
             pass  # API no longer supported (INAV 2.3.0)
+
+    def process_MSP_SET_PID_ADVANCED(self, data):
+        logging.info("Advanced PID settings saved")
+
+    def process_MSP_DATAFLASH_ERASE(self, data):
+        logging.info("Data flash erase begun...")
+
+    def process_MSP_SET_CF_SERIAL_CONFIG(self, data):
+        logging.info('Serial config saved')
+
+    def process_MSP_SET_RAW_RC(self, data):
+        logging.debug('RAW RC values updated')
+
+    def process_MSP_SET_PID(self, data):
+        logging.info('PID settings saved')
+
+    def process_MSP_SET_RC_TUNING(self, data):
+        logging.info('RC Tuning saved')
+
+    def process_MSP_ACC_CALIBRATION(self, data):
+        logging.info('Accel calibration executed')
+
+    def process_MSP_MAG_CALIBRATION(self, data):
+        logging.info('Mag calibration executed')
+
+    def process_MSP_SET_MOTOR_CONFIG(self, data):
+        logging.info('Motor Configuration saved')
+
+    def process_MSP_SET_GPS_CONFIG(self, data):
+        logging.info('GPS Configuration saved')
+
+    def process_MSP_SET_RSSI_CONFIG(self, data):
+        logging.info('RSSI Configuration saved')
+
+    def process_MSP_SET_FEATURE_CONFIG(self, data):
+        logging.info('Features saved')
+
+    def process_MSP_SET_BEEPER_CONFIG(self, data):
+        logging.info('Beeper Configuration saved')
+
+    def process_MSP_RESET_CONF(self, data):
+        logging.info('Settings Reset')
+
+    def process_MSP_SELECT_SETTING(self, data):
+        logging.info('Profile selected')
+
+    def process_MSP_SET_SERVO_CONFIGURATION(self, data):
+        logging.info('Servo Configuration saved')
+
+    def process_MSP_EEPROM_WRITE(self, data):
+        logging.info('Settings Saved in EEPROM')
+
+    def process_MSP_SET_CURRENT_METER_CONFIG(self, data):
+        logging.info('Amperage Settings saved')
+
+    def process_MSP_SET_VOLTAGE_METER_CONFIG(self, data):
+        logging.info('Voltage config saved')
 
     def process_MSP_SET_BLACKBOX_CONFIG(self, data):
         logging.info("Blackbox config saved")

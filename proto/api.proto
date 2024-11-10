@@ -53,7 +53,7 @@ message RcDataData {
 
 message FlagsData {
     string activeSensors = 1;
-    string armingDIsableFlags = 2;
+    string armingDisableFlags = 2;
     string mode = 3;
 }
 
