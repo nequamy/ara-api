@@ -1,11 +1,16 @@
 import dash
-from dash import dcc, html, Input, Output, callback
+import importlib.resources
+from dash import dcc
+from dash import html
+import dash.dependencies as dd
 import dash_bootstrap_components as dbc
+import dash_dangerously_set_inner_html
+from flask import render_template_string
 
-dash.register_page(__name__, path='/')
 
-layout = dbc.Container([
+dash.register_page(__name__, path="/docs")
 
-])
 
-# TODO: организовать подсасывание html, который сгенерировал readthedocs на основе папки docs из ветки feature/docs
+layout = html.Div(
+    html.A("See in next time")
+)

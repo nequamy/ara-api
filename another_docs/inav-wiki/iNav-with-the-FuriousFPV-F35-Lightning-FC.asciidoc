@@ -1,0 +1,1 @@
+iNav can be configured without using USB if you have TBS Crossfire. TO do this you must have an Android phone with Bluetooth and the required app. A connection diagram is shown below:

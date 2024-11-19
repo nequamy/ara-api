@@ -1,12 +1,15 @@
 from navigation.utils.pid import PID
 from navigation.utils.nav_drone_config import Drone
+from navigation.planners.nav_planner import NavPlanner
 
 import numpy as np
 from math import e, sin, cos, pi, radians
 import time
 
+# TODO: оснастить NAV_MULTIROTOR_PLANER модулем логирования данных
+# TODO: переорганизовать логику работы планера, добавить наследование от абстрактного класса Planner
 
-class Planner():
+class MultirotorPlanner(NavPlanner):
     def __init__(self, drone: Drone):
         self.alt_expo = [0]
         self.roll_pid = PID(kp=2.5, kd=1.5)

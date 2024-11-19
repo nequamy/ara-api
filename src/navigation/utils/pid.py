@@ -1,5 +1,6 @@
 import time
 
+# TODO: оснастить PID модулем логирования данных
 
 class PID(object):
     def __init__(self, kp: float = 0, ki: float = 0, kd: float = 0):
@@ -24,7 +25,7 @@ class PID(object):
         self.curr_time = None
         self.prev_time = time.time()
 
-    def compute(self, setpoint, value):
+    def compute_classic(self, setpoint, value):
         self.curr_time = time.time() if self.curr_time == None else self.curr_time
         self.err = setpoint - value
         # print(f"Error:\t{value}")
@@ -45,6 +46,14 @@ class PID(object):
         self.smoothed_pid = self.alpha * self.pid + (1 - self.alpha) * self.smoothed_pid
         
         return self.smoothed_pid
+
+    # TODO: реализовать PID-регулятор с windup компонентой
+    def compute_windup(self, setpoint, value):
+        pass
+
+    # TODO: реализовать PID-регулятор с feedforward компонентой
+    def compute_feedforward(self, setpoint, value):
+        pass
 
     def set_kp(self, proportional_gain):
         """Determines how aggressively the PID reacts to the current error with setting Proportional Gain"""

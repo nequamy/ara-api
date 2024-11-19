@@ -26,6 +26,7 @@ else:
 logging.basicConfig(level=logging.INFO, filename='inavmspapi_log.log', filemode='w')
 
 
+
 class MultirotorControl:
     MSPCodes = MSPCodes
     MSPCodes2Str = {v: i for i, v in MSPCodes.items()}
