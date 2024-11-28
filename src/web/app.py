@@ -19,7 +19,7 @@ app = dash.Dash(__name__, use_pages=True, external_stylesheets=[dbc.themes.SLATE
 # Define the navigation bar
 navbar = dbc.NavbarSimple(
     children=[
-        dbc.NavItem(dbc.NavLink("Docs", href="/docs")),
+        dbc.NavItem(dbc.NavLink("Docs", href="http://127.0.0.1:5000/", external_link=True)),
         dbc.NavItem(dbc.NavLink("Analyzer", href="/analyzer")),
         dbc.NavItem(dbc.NavLink("Position checker", href="/position")),
     ],
