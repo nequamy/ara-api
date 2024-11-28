@@ -12,6 +12,7 @@ packages = [
     { include = "protos", from = "src/"},
     { include = "stream", from = "src/"},
     { include = "web", from = "src/"},
+    { include = "gui", from = "src/"},
 ]
 
 [tool.poetry.dependencies]
