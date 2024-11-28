@@ -23,9 +23,7 @@ else:
     def ffs(x):  # modified from https://stackoverflow.com/a/36059264
         return (x & -x).bit_length()
 
-logging.basicConfig(level=logging.INFO, filename='ara-api.log', filemode='w')
-
-
+logging.basicConfig(level=logging.INFO, filename='ara_api_msp_controller.log', filemode='w')
 
 class MultirotorControl:
     MSPCodes = MSPCodes
