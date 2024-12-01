@@ -17,7 +17,7 @@ class SphinxFlaskApp:
     def documentation(self, filename):
         return send_from_directory(self.sphinx_directory, filename)
 
-    def run(self, debug=True):
+    def run(self, debug=False):
         self.app.run(debug=debug)
 
 
@@ -28,4 +28,4 @@ if not os.path.exists(sphinx_directory):
 
 if __name__ == '__main__':
     app = SphinxFlaskApp('Sphinx Documentation App', sphinx_directory)
-    app.run()
+    app.run(True)
