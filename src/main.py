@@ -1,5 +1,11 @@
-from tmp.app import Api
-from navigation.utils.nav_drone_config import ARA_mini
+import multiprocessing
+
+from mdit_py_plugins.myst_blocks.index import target
+
+from gui.app_gui import GUI
+from driver.msp_service import MSPDriverManagerGRPC
+from navigation.nav_service import NavigationManagerGRPC
+from web.docs_app import SphinxFlaskApp
 
 """
 Список методов API:
@@ -27,33 +33,56 @@ api.rc_out - структура из папки data со значениями R
 P.s. строчки над "Начало кода" и под "Конец кода" оставляем не тронутыми.
 """
 
+#
+# def main():
+#     gui = GUI()
+#     gui.run()
+#
+#
+# if __name__ == "__main__":
+#     main()
 
-def main():
-    drone = ARA_mini()
-    # api = Api("127.0.0.1", 5760, drone)
-    api = Api("192.168.2.113", 5760, drone)
-    api.update_loop()
-    # stream = Stream()
+import multiprocessing
+import os
+from gui.app_gui import GUI
+from navigation.nav_service import NavigationManagerGRPC
+from web.docs_app import SphinxFlaskApp
+from driver.msp_service import main as msp_main
 
-    # stream_thread = Thread(target=stream.stream, args=(), daemon=True)
-    # update_thread = Thread(target=api.update_loop, args=(), daemon=True)
-    # stream_thread.start()
-    # update_thread.start()
-    #
-    # time.sleep(1)
-    #
-    ####### Начало кода ########
+sphinx_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../docs/html/'))
 
-    # api.set_arm_state(1)
-    # api.set_nav_state(2)
+class APPManager:
+    def __init__(self):
+        self.gui = GUI()
+        self.services = []
 
-    print(api.go_to_xy(1, 0, 0))
-    #
-    ####### Конец кода ########
-    #
-    # update_thread.join()
-    # stream_thread.join()
+    def add_service(self, service):
+        self.services.append(service)
 
+    def start_services(self):
+        processes = []
+        for service in self.services:
+            process = multiprocessing.Process(target=service.main, args=())
+            processes.append(process)
+            process.start()
 
-if __name__ == "__main__":
-    main()
+        for process in processes:
+            process.join()
+
+if __name__ == '__main__':
+    # navigationServiceManager = NavigationManagerGRPC()
+    sphinxFlaskApp = SphinxFlaskApp('ARA API DOCS', sphinx_directory)
+
+    app = APPManager()
+    # app.add_service(navigationServiceManager)
+    # app.add_service(sphinxFlaskApp)
+
+    # Add MSP service using the imported main function
+    msp_process = multiprocessing.Process(target=msp_main)
+    sphinx_process = multiprocessing.Process(target=sphinxFlaskApp.run())
+    sphinx_process.start()
+    msp_process.start()
+
+    # app.start_services()
+    msp_process.join()
+    sphinx_process.join()
