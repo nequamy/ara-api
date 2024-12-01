@@ -1,5 +1,6 @@
 import grpc
 import time
+import os
 import asyncio
 from threading import Thread
 import logging
@@ -12,26 +13,58 @@ from protos.api_pb2_grpc import add_DriverManagerServicer_to_server
 logging.basicConfig(level=logging.INFO, filename='ara_api_msp_service.log', filemode='w')
 
 class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
-    def __init__(self, address, type):
-        self.transmitter = serialize(address, type)
-        self.msp_controller = MultirotorControl(self.transmitter)
+    def __init__(self, address: tuple, type: str):
+        self.__init_logging__('log')
+
+        self.transmitter = TCPTransmitter(("192.168.2.113", 5760))
+        self.msp_controller = MultirotorControl(self.transmitter, self.driver_logging)
         self.msp_controller.connect()
 
         self.rc_send = self.rc_get = [1500, 1500, 1000, 1500, 1000, 1000, 1000, 1000]
 
+    def __init_logging__(self, log_directory='log'):
+        if not os.path.exists(log_directory):
+            os.makedirs(log_directory)
+
+        self.data_logging = logging.getLogger('msp_data')
+        self.data_logging.setLevel(logging.INFO)
+        self.data_formater = logging.Formatter('%(asctime)s - %(message)s')
+        self.data_handler = logging.FileHandler(os.path.join(log_directory, 'msp_data.log'))
+        self.data_handler.setFormatter(self.data_formater)
+        self.data_logging.addHandler(self.data_handler)
+
+        self.state_logging = logging.getLogger('state')
+        self.state_logging.setLevel(logging.INFO)
+        self.state_formater = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.state_handler = logging.FileHandler(os.path.join(log_directory, 'msp_state.log'))
+        self.state_handler.setFormatter(self.state_formater)
+        self.state_logging.addHandler(self.state_handler)
+
+        self.driver_logging = logging.getLogger('state')
+        self.driver_logging.setLevel(logging.INFO)
+        self.driver_formater = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        self.driver_handler = logging.FileHandler(os.path.join(log_directory, 'msp_driver.log'))
+        self.driver_handler.setFormatter(self.driver_formater)
+        self.driver_logging.addHandler(self.driver_handler)
+
     def update_data(self):
-        try:
-            self.msp_controller.msp_read_imu_data()
-            self.msp_controller.msp_read_sonar_data()
-            self.msp_controller.msp_read_attitude_data()
-            self.msp_controller.msp_read_analog_data()
-            self.msp_controller.msp_read_odom_data()
-            self.msp_controller.msp_read_flags_data()
-            self.msp_controller.msp_read_optical_flow_data()
-        except Exception as e:
-            logging.error(e)
+        while True:
+            # try:
+                self.msp_controller.msp_read_imu_data()
+                self.msp_controller.msp_read_sonar_data()
+                self.msp_controller.msp_read_attitude_data()
+                self.msp_controller.msp_read_analog_data()
+                self.msp_controller.msp_read_odom_data()
+                self.msp_controller.msp_read_flags_data()
+                self.msp_controller.msp_read_optical_flow_data()
+                self.data_logging.info(self.msp_controller.SENSOR_DATA)
+                print(self.msp_controller.SENSOR_DATA)
+                time.sleep(0.05)
+#             except Exception as e:
+#                 self.data_logging.error(e)
 
     async def GetImuDataRPC(self, request, context):
+        self.state_logging.info(f'[IMU]: Request from: {context.peer() }')
         while True:
             try:
                 data = api_pb2.IMUData(
@@ -45,9 +78,10 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 yield data
                 time.sleep(0.05)
             except Exception as e:
-                logging.error(e)
+                self.state_logging.error("[IMU]: "+ str(e))
 
     async def GetSonarDataRPC(self, request, context):
+        self.state_logging.info(f'[SONAR]: Request from: {context.peer() }')
         while True:
             try:
                 data = api_pb2.SonarData(
@@ -56,9 +90,10 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 yield data
                 time.sleep(0.05)
             except Exception as e:
-                logging.error(e)
+                self.state_logging.error("[SONAR]: " + str(e))
 
     async def GetAnalogDataRPC(self, request, context):
+        self.state_logging.info(f'[ANALOG]: Request from: {context.peer() }')
         while True:
             try:
                 data = api_pb2.AnalogData(
@@ -70,9 +105,10 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 yield data
                 time.sleep(0.05)
             except Exception as e:
-                logging.error(e)
+                self.state_logging.error("[ANALOG]: " + str(e))
 
     async def GetAttitudeDataRPC(self, request, context):
+        self.state_logging.info(f'[ATTITUDE]: Request from: {context.peer() }')
         while True:
             try:
                 data = api_pb2.AttitudeData(
@@ -84,9 +120,10 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 )
                 yield data
             except Exception as e:
-                logging.error(e)
+                self.state_logging.error("[ATTITUDE]: " + str(e))
 
     async def GetOdometryDataRPC(self, request, context):
+        self.state_logging.info(f'[ODOM]: Request from: {context.peer() }')
         while True:
             try:
                 data = api_pb2.OdometryData(
@@ -104,9 +141,10 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 )
                 yield data
             except Exception as e:
-                logging.error(e)
+                self.state_logging.error("[ODOM]: " + str(e))
 
     async def GetOpticalFlowDataRPC(self, request, context):
+        self.state_logging.info(f'[OPTFLOW]: Request from: {context.peer() }')
         while True:
             try:
                 data = api_pb2.OpticalFlowData(
@@ -118,9 +156,10 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 )
                 yield data
             except Exception as e:
-                logging.error(e)
+                self.state_logging.error("[OPTFLOW]: " + str(e))
 
     async def GetFlagsDataRPC(self, request, context):
+        self.state_logging.info(f'[FLAGS]: Request from: {context.peer() }')
         while True:
             try:
                 data = api_pb2.FlagsData(
@@ -130,9 +169,10 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 )
                 yield data
             except Exception as e:
-                logging.error(e)
+                self.state_logging.error("[FLAGS]: " + str(e))
 
     async def SendRcDataRPC(self, request, context):
+        self.state_logging.info(f'[RCIN]: Request from: {context.peer() }')
         try:
             self.rc_send = [
                 request.ail,
@@ -151,7 +191,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             )
             return response
         except Exception as e:
-            logging.error(e)
+            self.state_logging.error("[RCIN]: " + str(e))
 
 
 async def serve(manager):
@@ -164,13 +204,12 @@ async def serve(manager):
     await server.wait_for_termination()
 
 def main(*args, **kwargs):
-    msp_driver_manager_grpc = MSPDriverManagerGRPC(("192.168.2.1", 14550), "udp")
-    update_thread = Thread(target=msp_driver_manager_grpc.update_data(), args=(), daemon=True)
+    msp_service = MSPDriverManagerGRPC(("192.168.2.113", 14550), "udp")
+    update_thread = Thread(target=msp_service.update_data(), args=(), daemon=True)
 
     update_thread.start()
-    asyncio.run(serve(msp_driver_manager_grpc))
+    # asyncio.run(serve(msp_service))
     update_thread.join()
-    
+
 if __name__ == "__main__":
     main()
-    
