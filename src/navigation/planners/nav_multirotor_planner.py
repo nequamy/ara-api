@@ -1,242 +1,158 @@
-from navigation.utils.pid import PID
-from navigation.utils.nav_drone_config import Drone
-from navigation.planners.nav_planner import NavPlanner
-
-import numpy as np
-from math import e, sin, cos, pi, radians
 import time
 
-# TODO: оснастить NAV_MULTIROTOR_PLANER модулем логирования данных
-# TODO: переорганизовать логику работы планера, добавить наследование от абстрактного класса Planner
+from navigation.planners.nav_planner import NavPlanner
+from navigation.utils.pid import PID
+from navigation.utils.nav_drone_config import Drone
+from navigation.utils.helpers import exponential_ramp, remap, constrain, transform_multirotor_speed, DataFetcher
 
-class MultirotorPlanner(NavPlanner):
+class NavigationMultirotorPlanner(NavPlanner):
     def __init__(self, drone: Drone):
-        self.alt_expo = [0]
-        self.roll_pid = PID(kp=2.5, kd=1.5)
-        self.pitch_pid = PID(kp=2.5, kd=1.5)
-        self.yaw_pid = PID(kp=3)
+        self.roll_pid = PID(kp=2.5, kd=1.5, name="Roll")
+        self.pitch_pid = PID(kp=2.5, kd=1.5, name="Pitch")
+        self.yaw_pid = PID(kp=2.5, kd=1.5, name="Yaw")
 
         self.drone = drone
+        self.grpc_driver = DataFetcher()
 
-        self.target_x = 0
-        self.target_y = 0
-        self.target_altitude = 0
-        self.target_yaw = 0
-
-        self.roll = 0
-        self.pitch = 0
-        self.throttle = 1000
-        self.yaw = 0
-
-        self.odom = {
-            'position': [0, 0, 0],
-            'velocity': [0, 0, 0],
-            'yaw': 0,
+        self.target = {
+            'x':                    0.0,
+            'y':                    0.0,
+            'z':                    0.0,
+            'yaw':                  0.0,
         }
 
-        self.rc_channels = 0
+        self.channels = {
+            'roll':                 1500.0,
+            'pitch':                1500.0,
+            'throttle':             1000.0,
+            'yaw':                  1500.0,
+        }
 
-        self.roll_corrected = 1500
-        self.pitch_corrected = 1500
-        self.yaw_corrected = 1500
+        self.odometry = {
+            'position':             (0.0, 0.0, 0.0),
+            'orientation':          (0.0, 0.0, 0.0),
+            'velocity':             (0.0, 0.0, 0.0),
+        }
 
-        self.approx_koef = 0.2
+        self.imu= {
+            'gyroscope':            (0.0, 0.0, 0.0),
+            'accelerometer':        (0.0, 0.0, 0.0),
+        }
 
-        self.upper_threshold = 2000
-        self.lower_threshold = 1000
+        self.altitude = {
+            'sonar':                0.0,
+            'barometer':            0.0,
+        }
 
-        self.time_delay = 0.4
+        self.optical_flow = {
+            'quality':              0.0,
+            'flow_rate_x':          0.0,
+            'flow_rate_y':          0.0,
+            'body_rate_x':          0.0,
+            'body_rate_y':          0.0,
+        }
 
-        self.g = 9.80665
+        self.flags = {
+            'activeSensors':        0,
+            'armingDisableFlags':   0,
+            'mode':                 0,
+        }
 
-    def compute(self):
-        # self.compute_xy()
-        self.compute_yaw()
+        self.approx_koeff = 0.2
+        self.alt_expo = None
 
-        self.transform_speed_to_local()
+        self.time_delay = 0.1
 
-        self.roll_corrected = 1500 + int(self.remap_by_max_min(self.roll, -2, 2, -300, 300))
-        self.pitch_corrected = 1500 + int(self.remap_by_max_min(self.pitch, -2, 2, -300, 300))
-        self.yaw_corrected = 1500 + int(self.remap_by_max_min(self.yaw, -2, 2, -300, 300))
-        print(self.orient.body_rate.z)
-        # print(self.yaw_corrected)
-
-    def compute_xy(self):
-        self.pitch = self.pitch_pid.compute(self.target_x, self.odom['position'][0])
-        self.roll = self.roll_pid.compute(self.target_y, self.odom['position'][1])
-
-    def compute_yaw(self):
-        self.yaw = self.yaw_pid.compute(self.target_yaw, self.orient.body_rate.z)
-        self.yaw = self.constrain(self.yaw, -2, 2)
 
     def takeoff(self):
         i = 0
-        self.alt_expo = self.exponential_ramp(self.remap(self.target_altitude))
+        self.alt_expo = exponential_ramp(remap(self.target['z'], ), )
 
-        while not self.check_desired_altitude():
-            try:
-                time.sleep(self.time_delay)
-                self.throttle = int(self.alt_expo[i])
-                if (i + 1) >= len(self.alt_expo):
-                    continue
-                else:
-                    i += 1
-            except Exception as err:
-                print("ERR:" + str(err))
-                return False
+        self.grpc_driver.get_sonar_data()
 
-        return True
+        try:
+            time.sleep(self.time_delay)
+            self.channels['throttle'] = int(self.alt_expo[i])
+            if (i + 1) >= len(self.alt_expo):
+                return True
+            else:
+                i += 1
+        except Exception as err:
+            print("ERR:" + str(err))
+            return False
 
     def land(self):
         i = 0
-        self.alt_expo = self.exponential_ramp(self.throttle)[::-1]
+        self.alt_expo = exponential_ramp(self.channels['throttle'])[::-1]
 
-        while not self.check_desired_altitude():
-            try:
-                time.sleep(self.time_delay)
-                self.throttle = int(self.alt_expo[i])
-                if (i + 1) >= len(self.alt_expo):
-                    continue
-                else:
-                    i += 1
-            except Exception as err:
-                print("ERR: land error" + str(err))
-                return False
+        self.grpc_driver.get_sonar_data()
 
-        return True
-
-    def set_point(self, x: int | float = None, y: int | float = None,
-                  altitude: int | float = None, yaw: int | float = None):
-        if x is not None:
-            self.target_x = x
-        if y is not None:
-            self.target_y = y
-        if altitude is not None:
-            self.target_altitude = altitude
-        if yaw is not None:
-            self.target_yaw = radians(yaw)
-            self.target_yaw = -self.remap_by_max_min(self.target_yaw, 2 * pi, 0, -pi, pi)
-
-    def set_throttle(self, throttle: int | float = None):
-        if throttle < 1000:
-            print("ERR: throttle so low")
-            return False
-
-        self.throttle = throttle
-
-    def set_ang_zero(self, z):
-        self.z_zero = z
-
-    def set_attitude(self, att):
-        self.orient = att
-
-        self.orient.body_rate.x = -self.orient.body_rate.x
-        self.orient.body_rate.y = -self.orient.body_rate.y
-        self.orient.body_rate.z = -self.remap_by_max_min(self.orient.body_rate.z, (2 * pi) - self.z_zero,
-                                                         (0 - self.z_zero), -pi, pi)
-
-        # print(f"X:\t{self.orient.body_rate.x}\nY:\t{self.orient.body_rate.y}\nZ:\t{self.orient.body_rate.z}\n")
-
-    def set_odom(self, odom):
-        self.odom = odom
-
-    def set_vel_x(self, x: int | float = None):
-        self.pitch_corrected = 1500 + int(self.remap_by_max_min(x, -2, 2, -300, 300))
-
-    def set_vel_y(self, y: int | float = None):
-        self.roll_corrected = 1500 + int(self.remap_by_max_min(y, -2, 2, -300, 300))
-
-    def transform_speed_to_local(self):
-        roll_rad = self.orient.body_rate.x
-        pitch_rad = self.orient.body_rate.y
-        yaw_rad = self.orient.body_rate.z
-
-        syaw = sin(yaw_rad)
-        cyaw = cos(yaw_rad)
-
-        spitch = sin(pitch_rad)
-        cpitch = cos(pitch_rad)
-
-        sroll = sin(roll_rad)
-        croll = cos(roll_rad)
-
-        r_matrix = np.array([
-            [
-                cyaw * cpitch,
-                cyaw * spitch * sroll - syaw * croll,
-                cyaw * spitch * croll + syaw * sroll
-            ],
-            [
-                syaw * cpitch,
-                syaw * spitch * sroll + cyaw * croll,
-                syaw * spitch * croll - cyaw * sroll
-            ],
-            [
-                -spitch,
-                cpitch * sroll,
-                cpitch * croll
-            ]
-        ])
-
-        r_transposed = np.transpose(r_matrix)
-
-        v_local = r_transposed @ np.array([self.roll, self.pitch, self.yaw])
-
-        self.roll = self.constrain(v_local[0], -2, 2)
-        self.pitch = self.constrain(v_local[1], -2, 2)
-
-    def normalize_radians(self, angle):
-        normalized_yaw = (angle + 2 * np.pi) % (2 * np.pi)
-
-        return normalized_yaw
-
-    def exponential_ramp(self, target_value: float = 0):
-        target_value = min(target_value, self.upper_threshold)
-
-        num_steps = (target_value / 200) * e
-
-        k = np.log(target_value / self.lower_threshold) / (num_steps - 1)
-        values = self.lower_threshold * np.exp(k * np.arange(num_steps))
-
-        values = np.int32(np.minimum(values, self.upper_threshold))
-
-        return values
-
-    def check_desired_xyy(self):
-        return self.check_desired_yaw() and self.check_desired_position()
-
-    def check_desired_yaw(self) -> bool:
-        if self.target_yaw - 0.1 < self.orient.body_rate.z < self.target_yaw + 0.1:
-            return True
-        else:
-            return False
-
-    def check_desired_altitude(self, alt: int = None) -> bool:
-        if alt is None:
-            check_alt = self.alt_expo[len(self.alt_expo) - 1]
-        else:
-            check_alt = 1000 + 500 * alt
-
-        if self.throttle == check_alt:
-            return True
-        else:
-            return False
-
-    def check_desired_position(self) -> bool:
-        if (self.target_x - 0.12) < self.odom['position'][0] < (self.target_x + 0.12):
-            if self.target_y - 0.12 < self.odom['position'][1] < self.target_y + 0.12:
+        try:
+            time.sleep(self.time_delay)
+            self.channels['throttle'] = int(self.alt_expo[i])
+            if (i + 1) >= len(self.alt_expo):
                 return True
             else:
-                return False
-        else:
+                i += 1
+        except Exception as err:
+            print("ERR: land error" + str(err))
             return False
 
-    def remap(self, x):
-        return (x - self.drone.min_altitude) * (self.upper_threshold - self.lower_threshold) / (
-                self.drone.max_altitude - self.drone.min_altitude) + self.lower_threshold
+    def set_point_to_move(self, x: float, y: float, z: float):
+        self.target['x'] = x
+        self.target['y'] = y
+        self.target['z'] = z
 
-    def remap_by_max_min(self, x, min_old, max_old, min_new, max_new):
-        return (x - min_old) * (max_new - min_new) / (max_old - min_old) + min_new
+    def move(self):
+        grpc_odom = self.grpc_driver.get_odometry_data()
+        grpc_att = self.grpc_driver.get_attitude_data()
+        self.odometry['position'] = grpc_odom['position']
+        self.odometry['velocity'] = grpc_odom['velocity']
+        self.odometry['orientation'] = grpc_att['orientation']
 
-    def constrain(self, val, min_val, max_val):
-        return min(max_val, max(min_val, val))
+        pitch_computed = self.pitch_pid.compute_classic(
+            setpoint=self.target['x'],
+            value=self.odometry['position'][0]
+        )
+
+        roll_computed = self.roll_pid.compute_classic(
+            setpoint=self.target['y'],
+            value=self.odometry['position'][1]
+        )
+
+        yaw_computed = constrain(
+            self.yaw_pid.compute_classic(
+                setpoint=self.target['yaw'],
+                value=self.odometry['orientation'][2]
+            ),
+            min_val=-2,
+            max_val=2
+        )
+
+        self.channels['roll'], self.channels['pitch'], self.channels['yaw'] = transform_multirotor_speed(
+            roll=self.odometry['orientation'][0],
+            pitch=self.odometry['orientation'][1],
+            yaw=self.odometry['orientation'][2],
+            speed_roll=roll_computed,
+            speed_pitch=pitch_computed,
+            speed_yaw=yaw_computed
+        )
+
+        self.channels['roll'] = 1500 + int(remap(self.channels['roll'], -2, 2, -300, 300))
+        self.channels['pitch'] = 1500 + int(remap(self.channels['pitch'], -2, 2, -300, 300))
+        self.channels['yaw'] = 1500 + int(remap(self.channels['yaw'], -2, 2, -300, 300))
+
+    def set_velocity(self, vx: float, vy: float, vz: float):
+        pass
+
+    def check_desired_altitude(self) -> bool:
+        pass
+
+    def check_desired_position(self) -> bool:
+        pass
+
+if __name__ == "__main__":
+    drone = Drone()
+    planner = NavigationMultirotorPlanner(drone)
+    while True:
+        planner.move()
