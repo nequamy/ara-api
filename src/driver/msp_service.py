@@ -16,7 +16,8 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
     def __init__(self, address: tuple, type: str):
         self.__init_logging__('log')
 
-        self.transmitter = UDPTransmitter(("192.168.2.113", 14550))
+        # TODO: разобраться почему не работает UDPTransmitter
+        self.transmitter = TCPTransmitter(("192.168.2.113", 5760))
         self.msp_controller = MultirotorControl(self.transmitter, self.driver_logging)
         self.msp_controller.connect()
 
@@ -49,7 +50,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
 
     def update_data(self):
         while True:
-            # try:
+            try:
                 self.msp_controller.msp_read_imu_data()
                 self.msp_controller.msp_read_sonar_data()
                 self.msp_controller.msp_read_attitude_data()
@@ -58,118 +59,115 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 self.msp_controller.msp_read_flags_data()
                 self.msp_controller.msp_read_optical_flow_data()
                 self.data_logging.info(self.msp_controller.SENSOR_DATA)
-                print(self.msp_controller.SENSOR_DATA)
+                # print(self.msp_controller.SENSOR_DATA)
                 time.sleep(0.05)
-#             except Exception as e:
-#                 self.data_logging.error(e)
+            except Exception as e:
+                self.data_logging.error(e)
 
     async def GetImuDataRPC(self, request, context):
         self.state_logging.info(f'[IMU]: Request from: {context.peer() }')
-        while True:
-            try:
-                data = api_pb2.IMUData(
-                    gyro=api_pb2.Vector3(x=self.msp_controller.SENSOR_DATA["gyroscope"][0],
-                                         y=self.msp_controller.SENSOR_DATA["gyroscope"][1],
-                                         z=self.msp_controller.SENSOR_DATA["gyroscope"][2]),
-                    acc=api_pb2.Vector3(x=self.msp_controller.SENSOR_DATA['accelerometer'][0],
-                                        y=self.msp_controller.SENSOR_DATA['accelerometer'][1],
-                                        z=self.msp_controller.SENSOR_DATA['accelerometer'][2])
-                )
-                yield data
-                time.sleep(0.05)
-            except Exception as e:
-                self.state_logging.error("[IMU]: "+ str(e))
+        try:
+            data = api_pb2.IMUData(
+                gyro=api_pb2.Vector3(x=self.msp_controller.SENSOR_DATA["gyroscope"][0],
+                                     y=self.msp_controller.SENSOR_DATA["gyroscope"][1],
+                                     z=self.msp_controller.SENSOR_DATA["gyroscope"][2]),
+                acc=api_pb2.Vector3(x=self.msp_controller.SENSOR_DATA['accelerometer'][0],
+                                    y=self.msp_controller.SENSOR_DATA['accelerometer'][1],
+                                    z=self.msp_controller.SENSOR_DATA['accelerometer'][2])
+            )
+            time.sleep(0.05)
+            return data
+        except Exception as e:
+            self.state_logging.error("[IMU]: "+ str(e))
 
     async def GetSonarDataRPC(self, request, context):
         self.state_logging.info(f'[SONAR]: Request from: {context.peer() }')
-        while True:
-            try:
-                data = api_pb2.SonarData(
-                    sonar=self.msp_controller.SENSOR_DATA["sonar"],
-                )
-                yield data
-                time.sleep(0.05)
-            except Exception as e:
-                self.state_logging.error("[SONAR]: " + str(e))
+        try:
+            data = api_pb2.SonarData(
+                sonar=self.msp_controller.SENSOR_DATA["sonar"],
+            )
+            time.sleep(0.05)
+            return data
+        except Exception as e:
+            self.state_logging.error("[SONAR]: " + str(e))
 
     async def GetAnalogDataRPC(self, request, context):
         self.state_logging.info(f'[ANALOG]: Request from: {context.peer() }')
-        while True:
-            try:
-                data = api_pb2.AnalogData(
-                    voltage=self.msp_controller.ANALOG['voltage'],
-                    mAhdrawn=self.msp_controller.ANALOG['mAhdrawn'],
-                    rssi=self.msp_controller.ANALOG['rssi'],
-                    amperage=self.msp_controller.ANALOG['amperage'],
-                )
-                yield data
-                time.sleep(0.05)
-            except Exception as e:
-                self.state_logging.error("[ANALOG]: " + str(e))
+        try:
+            data = api_pb2.AnalogData(
+                voltage=self.msp_controller.ANALOG['voltage'],
+                mAhdrawn=self.msp_controller.ANALOG['mAhdrawn'],[]
+                rssi=self.msp_controller.ANALOG['rssi'],
+                amperage=self.msp_controller.ANALOG['amperage'],
+            )
+            time.sleep(0.05)
+            return data
+        except Exception as e:
+            self.state_logging.error("[ANALOG]: " + str(e))
 
     async def GetAttitudeDataRPC(self, request, context):
         self.state_logging.info(f'[ATTITUDE]: Request from: {context.peer() }')
-        while True:
-            try:
-                data = api_pb2.AttitudeData(
-                    orient=api_pb2.Vector3(
-                        x=self.msp_controller.SENSOR_DATA['kinematics'][0],
-                        y=self.msp_controller.SENSOR_DATA['kinematics'][1],
-                        z=self.msp_controller.SENSOR_DATA['kinematics'][2],
-                    ),
-                )
-                yield data
-            except Exception as e:
-                self.state_logging.error("[ATTITUDE]: " + str(e))
+        try:
+            data = api_pb2.AttitudeData(
+                orient=api_pb2.Vector3(
+                    x=self.msp_controller.SENSOR_DATA['kinematics'][0],
+                    y=self.msp_controller.SENSOR_DATA['kinematics'][1],
+                    z=self.msp_controller.SENSOR_DATA['kinematics'][2],
+                ),
+            )
+            time.sleep(0.05)
+            return data
+        except Exception as e:
+            self.state_logging.error("[ATTITUDE]: " + str(e))
 
     async def GetOdometryDataRPC(self, request, context):
         self.state_logging.info(f'[ODOM]: Request from: {context.peer() }')
-        while True:
-            try:
-                data = api_pb2.OdometryData(
-                    pos=api_pb2.Vector3(
-                        x=self.msp_controller.SENSOR_DATA['odom']['position'][0],
-                        y=self.msp_controller.SENSOR_DATA['odom']['position'][1],
-                        z=self.msp_controller.SENSOR_DATA['odom']['position'][2],
-                    ),
-                    vel=api_pb2.Vector3(
-                        x=self.msp_controller.SENSOR_DATA['odom']['velocity'][0],
-                        y=self.msp_controller.SENSOR_DATA['odom']['velocity'][1],
-                        z=self.msp_controller.SENSOR_DATA['odom']['velocity'][2],
-                    ),
-                    yaw=self.msp_controller.SENSOR_DATA['odom']['yaw'],
-                )
-                yield data
-            except Exception as e:
-                self.state_logging.error("[ODOM]: " + str(e))
+        try:
+            data = api_pb2.OdometryData(
+                pos=api_pb2.Vector3(
+                    x=self.msp_controller.SENSOR_DATA['odom']['position'][0],
+                    y=self.msp_controller.SENSOR_DATA['odom']['position'][1],
+                    z=self.msp_controller.SENSOR_DATA['odom']['position'][2],
+                ),
+                vel=api_pb2.Vector3(
+                    x=self.msp_controller.SENSOR_DATA['odom']['velocity'][0],
+                    y=self.msp_controller.SENSOR_DATA['odom']['velocity'][1],
+                    z=self.msp_controller.SENSOR_DATA['odom']['velocity'][2],
+                ),
+                yaw=self.msp_controller.SENSOR_DATA['odom']['yaw'],
+            )
+            time.sleep(0.05)
+            return data
+        except Exception as e:
+            self.state_logging.error("[ODOM]: " + str(e))
 
     async def GetOpticalFlowDataRPC(self, request, context):
         self.state_logging.info(f'[OPTFLOW]: Request from: {context.peer() }')
-        while True:
-            try:
-                data = api_pb2.OpticalFlowData(
-                    quality=self.msp_controller.SENSOR_DATA["optical_flow"][0],
-                    flow_rate_x=self.msp_controller.SENSOR_DATA["optical_flow"][1],
-                    flow_rate_y=self.msp_controller.SENSOR_DATA["optical_flow"][2],
-                    body_rate_x=self.msp_controller.SENSOR_DATA["optical_flow"][3],
-                    body_rate_y=self.msp_controller.SENSOR_DATA["optical_flow"][4],
-                )
-                yield data
-            except Exception as e:
-                self.state_logging.error("[OPTFLOW]: " + str(e))
+        try:
+            data = api_pb2.OpticalFlowData(
+                quality=self.msp_controller.SENSOR_DATA["optical_flow"][0],
+                flow_rate_x=self.msp_controller.SENSOR_DATA["optical_flow"][1],
+                flow_rate_y=self.msp_controller.SENSOR_DATA["optical_flow"][2],
+                body_rate_x=self.msp_controller.SENSOR_DATA["optical_flow"][3],
+                body_rate_y=self.msp_controller.SENSOR_DATA["optical_flow"][4],
+            )
+            time.sleep(0.05)
+            return data
+        except Exception as e:
+            self.state_logging.error("[OPTFLOW]: " + str(e))
 
     async def GetFlagsDataRPC(self, request, context):
         self.state_logging.info(f'[FLAGS]: Request from: {context.peer() }')
-        while True:
-            try:
-                data = api_pb2.FlagsData(
-                    activeSensors=self.msp_controller.CONFIG['activeSensors'],
-                    armingDisableFlags=self.msp_controller.CONFIG['armingDisableFlags'],
-                    mode=self.msp_controller.CONFIG['mode'],
-                )
-                yield data
-            except Exception as e:
-                self.state_logging.error("[FLAGS]: " + str(e))
+        try:
+            data = api_pb2.FlagsData(
+                activeSensors=self.msp_controller.CONFIG['activeSensors'],
+                armingDisableFlags=self.msp_controller.CONFIG['armingDisableFlags'],
+                mode=self.msp_controller.CONFIG['mode'],
+            )
+            time.sleep(0.05)
+            return data
+        except Exception as e:
+            self.state_logging.error("[FLAGS]: " + str(e))
 
     async def SendRcDataRPC(self, request, context):
         self.state_logging.info(f'[RCIN]: Request from: {context.peer() }')
@@ -205,10 +203,11 @@ async def serve(manager):
 
 def main(*args, **kwargs):
     msp_service = MSPDriverManagerGRPC(("192.168.2.113", 14550), "udp")
-    update_thread = Thread(target=msp_service.update_data(), args=(), daemon=True)
+    update_thread = Thread(target=msp_service.update_data, args=(), daemon=True)
 
     update_thread.start()
-    # asyncio.run(serve(msp_service))
+    asyncio.run(serve(msp_service))
+
     update_thread.join()
 
 if __name__ == "__main__":
