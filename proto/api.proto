@@ -1,15 +1,15 @@
 syntax = "proto3";
 
 service DriverManager {
-    rpc GetImuDataRPC (GetRequest) returns (stream IMUData);
-    rpc GetSonarDataRPC (GetRequest) returns (stream SonarData);
-    rpc GetAnalogDataRPC (GetRequest) returns (stream AnalogData);
-    rpc GetAttitudeDataRPC (GetRequest) returns (stream AttitudeData);
-    rpc GetOdometryDataRPC (GetRequest) returns (stream OdometryData);
-    rpc GetOpticalFlowDataRPC (GetRequest) returns (stream OpticalFlowData);
-    rpc GetFlagsDataRPC (GetRequest) returns (stream FlagsData);
+    rpc GetImuDataRPC (GetRequest) returns (IMUData);
+    rpc GetSonarDataRPC (GetRequest) returns (SonarData);
+    rpc GetAnalogDataRPC (GetRequest) returns (AnalogData);
+    rpc GetAttitudeDataRPC (GetRequest) returns (AttitudeData);
+    rpc GetOdometryDataRPC (GetRequest) returns (OdometryData);
+    rpc GetOpticalFlowDataRPC (GetRequest) returns (OpticalFlowData);
+    rpc GetFlagsDataRPC (GetRequest) returns (FlagsData);
 
-    rpc SendRcDataRPC (stream RcDataData) returns (stream StatusData);
+    rpc SendRcDataRPC (RcDataData) returns (StatusData);
 }
 
 service NavigationManager {

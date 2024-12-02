@@ -3,9 +3,9 @@
 import grpc
 import warnings
 
-import protos.api_pb2 as api__pb2
+import api_pb2 as api__pb2
 
-GRPC_GENERATED_VERSION = '1.66.2'
+GRPC_GENERATED_VERSION = '1.67.1'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -34,42 +34,42 @@ class DriverManagerStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.GetImuDataRPC = channel.unary_stream(
+        self.GetImuDataRPC = channel.unary_unary(
                 '/DriverManager/GetImuDataRPC',
                 request_serializer=api__pb2.GetRequest.SerializeToString,
                 response_deserializer=api__pb2.IMUData.FromString,
                 _registered_method=True)
-        self.GetSonarDataRPC = channel.unary_stream(
+        self.GetSonarDataRPC = channel.unary_unary(
                 '/DriverManager/GetSonarDataRPC',
                 request_serializer=api__pb2.GetRequest.SerializeToString,
                 response_deserializer=api__pb2.SonarData.FromString,
                 _registered_method=True)
-        self.GetAnalogDataRPC = channel.unary_stream(
+        self.GetAnalogDataRPC = channel.unary_unary(
                 '/DriverManager/GetAnalogDataRPC',
                 request_serializer=api__pb2.GetRequest.SerializeToString,
                 response_deserializer=api__pb2.AnalogData.FromString,
                 _registered_method=True)
-        self.GetAttitudeDataRPC = channel.unary_stream(
+        self.GetAttitudeDataRPC = channel.unary_unary(
                 '/DriverManager/GetAttitudeDataRPC',
                 request_serializer=api__pb2.GetRequest.SerializeToString,
                 response_deserializer=api__pb2.AttitudeData.FromString,
                 _registered_method=True)
-        self.GetOdometryDataRPC = channel.unary_stream(
+        self.GetOdometryDataRPC = channel.unary_unary(
                 '/DriverManager/GetOdometryDataRPC',
                 request_serializer=api__pb2.GetRequest.SerializeToString,
                 response_deserializer=api__pb2.OdometryData.FromString,
                 _registered_method=True)
-        self.GetOpticalFlowDataRPC = channel.unary_stream(
+        self.GetOpticalFlowDataRPC = channel.unary_unary(
                 '/DriverManager/GetOpticalFlowDataRPC',
                 request_serializer=api__pb2.GetRequest.SerializeToString,
                 response_deserializer=api__pb2.OpticalFlowData.FromString,
                 _registered_method=True)
-        self.GetFlagsDataRPC = channel.unary_stream(
+        self.GetFlagsDataRPC = channel.unary_unary(
                 '/DriverManager/GetFlagsDataRPC',
                 request_serializer=api__pb2.GetRequest.SerializeToString,
                 response_deserializer=api__pb2.FlagsData.FromString,
                 _registered_method=True)
-        self.SendRcDataRPC = channel.stream_stream(
+        self.SendRcDataRPC = channel.unary_unary(
                 '/DriverManager/SendRcDataRPC',
                 request_serializer=api__pb2.RcDataData.SerializeToString,
                 response_deserializer=api__pb2.StatusData.FromString,
@@ -121,7 +121,7 @@ class DriverManagerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def SendRcDataRPC(self, request_iterator, context):
+    def SendRcDataRPC(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -130,42 +130,42 @@ class DriverManagerServicer(object):
 
 def add_DriverManagerServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'GetImuDataRPC': grpc.unary_stream_rpc_method_handler(
+            'GetImuDataRPC': grpc.unary_unary_rpc_method_handler(
                     servicer.GetImuDataRPC,
                     request_deserializer=api__pb2.GetRequest.FromString,
                     response_serializer=api__pb2.IMUData.SerializeToString,
             ),
-            'GetSonarDataRPC': grpc.unary_stream_rpc_method_handler(
+            'GetSonarDataRPC': grpc.unary_unary_rpc_method_handler(
                     servicer.GetSonarDataRPC,
                     request_deserializer=api__pb2.GetRequest.FromString,
                     response_serializer=api__pb2.SonarData.SerializeToString,
             ),
-            'GetAnalogDataRPC': grpc.unary_stream_rpc_method_handler(
+            'GetAnalogDataRPC': grpc.unary_unary_rpc_method_handler(
                     servicer.GetAnalogDataRPC,
                     request_deserializer=api__pb2.GetRequest.FromString,
                     response_serializer=api__pb2.AnalogData.SerializeToString,
             ),
-            'GetAttitudeDataRPC': grpc.unary_stream_rpc_method_handler(
+            'GetAttitudeDataRPC': grpc.unary_unary_rpc_method_handler(
                     servicer.GetAttitudeDataRPC,
                     request_deserializer=api__pb2.GetRequest.FromString,
                     response_serializer=api__pb2.AttitudeData.SerializeToString,
             ),
-            'GetOdometryDataRPC': grpc.unary_stream_rpc_method_handler(
+            'GetOdometryDataRPC': grpc.unary_unary_rpc_method_handler(
                     servicer.GetOdometryDataRPC,
                     request_deserializer=api__pb2.GetRequest.FromString,
                     response_serializer=api__pb2.OdometryData.SerializeToString,
             ),
-            'GetOpticalFlowDataRPC': grpc.unary_stream_rpc_method_handler(
+            'GetOpticalFlowDataRPC': grpc.unary_unary_rpc_method_handler(
                     servicer.GetOpticalFlowDataRPC,
                     request_deserializer=api__pb2.GetRequest.FromString,
                     response_serializer=api__pb2.OpticalFlowData.SerializeToString,
             ),
-            'GetFlagsDataRPC': grpc.unary_stream_rpc_method_handler(
+            'GetFlagsDataRPC': grpc.unary_unary_rpc_method_handler(
                     servicer.GetFlagsDataRPC,
                     request_deserializer=api__pb2.GetRequest.FromString,
                     response_serializer=api__pb2.FlagsData.SerializeToString,
             ),
-            'SendRcDataRPC': grpc.stream_stream_rpc_method_handler(
+            'SendRcDataRPC': grpc.unary_unary_rpc_method_handler(
                     servicer.SendRcDataRPC,
                     request_deserializer=api__pb2.RcDataData.FromString,
                     response_serializer=api__pb2.StatusData.SerializeToString,
@@ -192,7 +192,7 @@ class DriverManager(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(
+        return grpc.experimental.unary_unary(
             request,
             target,
             '/DriverManager/GetImuDataRPC',
@@ -219,7 +219,7 @@ class DriverManager(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(
+        return grpc.experimental.unary_unary(
             request,
             target,
             '/DriverManager/GetSonarDataRPC',
@@ -246,7 +246,7 @@ class DriverManager(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(
+        return grpc.experimental.unary_unary(
             request,
             target,
             '/DriverManager/GetAnalogDataRPC',
@@ -273,7 +273,7 @@ class DriverManager(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(
+        return grpc.experimental.unary_unary(
             request,
             target,
             '/DriverManager/GetAttitudeDataRPC',
@@ -300,7 +300,7 @@ class DriverManager(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(
+        return grpc.experimental.unary_unary(
             request,
             target,
             '/DriverManager/GetOdometryDataRPC',
@@ -327,7 +327,7 @@ class DriverManager(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(
+        return grpc.experimental.unary_unary(
             request,
             target,
             '/DriverManager/GetOpticalFlowDataRPC',
@@ -354,7 +354,7 @@ class DriverManager(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(
+        return grpc.experimental.unary_unary(
             request,
             target,
             '/DriverManager/GetFlagsDataRPC',
@@ -371,7 +371,7 @@ class DriverManager(object):
             _registered_method=True)
 
     @staticmethod
-    def SendRcDataRPC(request_iterator,
+    def SendRcDataRPC(request,
             target,
             options=(),
             channel_credentials=None,
@@ -381,8 +381,8 @@ class DriverManager(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.stream_stream(
-            request_iterator,
+        return grpc.experimental.unary_unary(
+            request,
             target,
             '/DriverManager/SendRcDataRPC',
             api__pb2.RcDataData.SerializeToString,
