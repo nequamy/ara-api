@@ -1,7 +1,7 @@
-from abc import ABC, abstractmethod
-
 # TODO: адаптировать Planner под абстрактный класс и импортировать во все планеры, наследуя при этом
 #       основные классы каждого планировщика от абстрактного общего класса
+
+from abc import ABC, abstractmethod
 
 class NavPlanner(ABC):
     @abstractmethod
@@ -17,5 +17,13 @@ class NavPlanner(ABC):
         pass
 
     @abstractmethod
-    def setVelocity(self):
+    def set_velocity(self, vx: float, vy: float, vz: float):
+        pass
+
+    @abstractmethod
+    def check_desired_altitude(self) -> bool:
+        pass
+
+    @abstractmethod
+    def check_desired_position(self) -> bool:
         pass
