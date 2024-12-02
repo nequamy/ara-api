@@ -80,7 +80,6 @@ class PID(object):
         Returns:
             float: The computed PID output.
         """
-        ..math:: P =, I = I + K_i * e * Δt, D = K_d * (e - e_prev) / Δt, PID = K_p * e + I + D
         self.curr_time = time.time() if self.curr_time is None else self.curr_time
         self.err = setpoint - value
 
