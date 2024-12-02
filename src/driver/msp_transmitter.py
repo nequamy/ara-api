@@ -46,11 +46,14 @@ class UDPTransmitter(Transmitter):
                 self.is_connect = True
 
                 logging.info("udp connect")
+                print("udp connect")
             except:
                 logging.error("cant connect to udp")
+                print("cant connect to udp")
 
         else:
             logging.info("udp_client is connected already")
+            print("udp_client is connected already")
 
     def disconnect(self):
         if self.is_connect is True:
@@ -62,26 +65,29 @@ class UDPTransmitter(Transmitter):
             except:
                 logging.error("cant close udp")
         else:
-            logging.info("tcp_client is disconnected already")
+            logging.info("udp_client is disconnected already")
 
     def send(self, bufView: bytearray, blocking: bool = True, timeout: int = -1):
-        try:
-            res = self.udp_client.send(bufView)
-            logging.info("RAW message sent by udp: {0}".format(bufView))
-            res = 1
-        except Exception as e:
-            logging.error(e)
-            res = 0
+        # try:
+        res = self.udp_client.send(bufView)
+        logging.info("RAW message sent by udp: {0}".format(bufView))
+        print("RAW message sent by udp: {0}".format(bufView))
+        res = 1
+        # except Exception as e:
+        #     logging.error(e)
+        #     res = 0
         return res
 
     def receive(self, size: int, timeout: int = 1):
-        try:
+        # try:
             msg_header = self.udp_client.recv(1)
             msg = self.udp_client.recv(size - 1)
             logging.info("Recived msg_header: {0}; msg: {1}".format(msg_header, msg))
+            print("Recived msg_header: {0}; msg: {1}".format(msg_header, msg))
             return msg_header, msg
-        except:
-            logging.info("Cant recive msg")
+        # except:
+        #     logging.info("Cant recive msg")
+        #     print("Cant recive msg")
 
     def local_read(self, size):
         return self.udp_client.recv(size)

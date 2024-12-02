@@ -1,14 +1,11 @@
 import dash
-from dash import dcc, html, Input, Output, callback
-import dash_bootstrap_components as dbc
-import plotly.express as px
-import pandas as pd
-
-from web.pages.analyzer import layout
+from dash import html
+import dash_mantine_components as dmc
 
 dash.register_page(__name__, path='/position')
 
-layout = html.Div("next time")
-
+layout = dmc.Center(
+    html.Div("Пока что тут ничего нет, меня добавят в будущих версиях", style={'textAlign': 'center'})
+)
 
 # TODO: реализовать страничку для отображения позиции через web интерфейс

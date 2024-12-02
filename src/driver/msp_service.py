@@ -16,7 +16,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
     def __init__(self, address: tuple, type: str):
         self.__init_logging__('log')
 
-        self.transmitter = TCPTransmitter(("192.168.2.113", 5760))
+        self.transmitter = UDPTransmitter(("192.168.2.113", 14550))
         self.msp_controller = MultirotorControl(self.transmitter, self.driver_logging)
         self.msp_controller.connect()
 
