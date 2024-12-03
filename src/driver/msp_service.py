@@ -96,7 +96,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
         try:
             data = api_pb2.AnalogData(
                 voltage=self.msp_controller.ANALOG['voltage'],
-                mAhdrawn=self.msp_controller.ANALOG['mAhdrawn'],[]
+                mAhdrawn=self.msp_controller.ANALOG['mAhdrawn'],
                 rssi=self.msp_controller.ANALOG['rssi'],
                 amperage=self.msp_controller.ANALOG['amperage'],
             )
@@ -190,7 +190,6 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             return response
         except Exception as e:
             self.state_logging.error("[RCIN]: " + str(e))
-
 
 async def serve(manager):
     server = grpc.aio.server()
