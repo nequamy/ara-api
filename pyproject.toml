@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ara-api"
-version = "1.0.0"
+version = "0.8.0"
 description = "Applied Robotics Avia API for ARA MINI, ARA EDU and ARA FPV drones"
 authors = ["Alexander Kleimenov <nequamy@gmail.com>"]
 license = "No"
@@ -43,8 +43,10 @@ dash-iconify = "^0.1.2"
 
 [tool.poetry.scripts]
 api = "src.main:main"
-test_driver = "src.driver.test:serve"
-test_nav = "src.navigation.test:run"
+docs = "src.web.docs_app:main"
+example_circle_by_speed = "example.move_by_speed(circle):main"
+example_square_by_speed = "example.move_by_speed(square):main"
+example_square_by_point = "example.move_by_point(square):main"
 
 [build-system]
 requires = ["poetry-core"]
