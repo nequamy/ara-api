@@ -13,8 +13,8 @@ service DriverManager {
 }
 
 service NavigationManager {
-    rpc TakeOFF (CommandData) returns (StatusData);
-    rpc Land (CommandData) returns (StatusData);
+    rpc TakeOFF (AltitudeSetData) returns (StatusData);
+    rpc Land (AltitudeSetData) returns (StatusData);
     rpc Move (PointData) returns (StatusData);
     rpc SetVelocity (VelocityData) returns (StatusData);
     rpc SetSettings (SettingsData) returns (StatusData);
@@ -22,6 +22,10 @@ service NavigationManager {
 
 message CommandData{
     string cmd = 1;
+}
+
+message AltitudeSetData{
+    float altitude = 1;
 }
 
 message StatusData {

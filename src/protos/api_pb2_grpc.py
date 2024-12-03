@@ -409,12 +409,12 @@ class NavigationManagerStub(object):
         """
         self.TakeOFF = channel.unary_unary(
                 '/NavigationManager/TakeOFF',
-                request_serializer=api__pb2.CommandData.SerializeToString,
+                request_serializer=api__pb2.AltitudeSetData.SerializeToString,
                 response_deserializer=api__pb2.StatusData.FromString,
                 _registered_method=True)
         self.Land = channel.unary_unary(
                 '/NavigationManager/Land',
-                request_serializer=api__pb2.CommandData.SerializeToString,
+                request_serializer=api__pb2.AltitudeSetData.SerializeToString,
                 response_deserializer=api__pb2.StatusData.FromString,
                 _registered_method=True)
         self.Move = channel.unary_unary(
@@ -472,12 +472,12 @@ def add_NavigationManagerServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'TakeOFF': grpc.unary_unary_rpc_method_handler(
                     servicer.TakeOFF,
-                    request_deserializer=api__pb2.CommandData.FromString,
+                    request_deserializer=api__pb2.AltitudeSetData.FromString,
                     response_serializer=api__pb2.StatusData.SerializeToString,
             ),
             'Land': grpc.unary_unary_rpc_method_handler(
                     servicer.Land,
-                    request_deserializer=api__pb2.CommandData.FromString,
+                    request_deserializer=api__pb2.AltitudeSetData.FromString,
                     response_serializer=api__pb2.StatusData.SerializeToString,
             ),
             'Move': grpc.unary_unary_rpc_method_handler(
@@ -521,7 +521,7 @@ class NavigationManager(object):
             request,
             target,
             '/NavigationManager/TakeOFF',
-            api__pb2.CommandData.SerializeToString,
+            api__pb2.AltitudeSetData.SerializeToString,
             api__pb2.StatusData.FromString,
             options,
             channel_credentials,
@@ -548,7 +548,7 @@ class NavigationManager(object):
             request,
             target,
             '/NavigationManager/Land',
-            api__pb2.CommandData.SerializeToString,
+            api__pb2.AltitudeSetData.SerializeToString,
             api__pb2.StatusData.FromString,
             options,
             channel_credentials,
