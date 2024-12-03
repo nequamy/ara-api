@@ -36,7 +36,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             context: The gRPC context.
 
         Returns:
-            api_pb2.TakeOFFResponse: The response indicating success.
+            api_pb2.StatusData: The response indicating success.
         """
         self.state |= NavigationManagerGRPC.NavigationFlags['takeoff']
 
@@ -46,7 +46,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             check_method=self.planner.check_desired_altitude
         )
 
-        return api_pb2.StatusData(success="OK")
+        return api_pb2.StatusData(status="OK")
 
     async def Land(self, request, context):
         """
@@ -57,7 +57,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             context: The gRPC context.
 
         Returns:
-            api_pb2.LandResponse: The response indicating success.
+            api_pb2.StatusData: The response indicating success.
         """
         self.state |= NavigationManagerGRPC.NavigationFlags['land']
 
@@ -67,7 +67,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             check_method=self.planner.check_desired_altitude
         )
 
-        return api_pb2.StatusData(success="OK")
+        return api_pb2.StatusData(status="OK")
 
     async def Move(self, request, context):
         """
@@ -78,7 +78,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             context: The gRPC context.
 
         Returns:
-            api_pb2.MoveResponse: The response indicating success.
+            api_pb2.StatusData: The response indicating success.
         """
         self.state |= NavigationManagerGRPC.NavigationFlags['move']
 
@@ -89,7 +89,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             check_method=self.planner.check_desired_position
         )
 
-        return api_pb2.StatusData(success="OK")
+        return api_pb2.StatusData(status="OK")
 
     async def SetVelocity(self, request, context):
         """
@@ -100,7 +100,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             context: The gRPC context.
 
         Returns:
-            api_pb2.SetVelocityResponse: The response indicating success.
+            api_pb2.StatusData: The response indicating success.
         """
         self.state |= NavigationManagerGRPC.NavigationFlags['set_velocity']
 
@@ -110,7 +110,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             check_method=self.planner.check_desired_position
         )
 
-        return api_pb2.StatusData(success="OK")
+        return api_pb2.StatusData(status="OK")
 
     async def SetSettings(self, request, context):
         """
@@ -121,7 +121,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             context: The gRPC context.
 
         Returns:
-            None
+            api_pb2.StatusData: The response indicating success.
         """
         # TODO: Implement the method to set settings
         pass
@@ -139,22 +139,33 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             None
         """
         async with grpc.aio.insecure_channel('localhost:50051') as channel:
-            stub = api_pb2_grpc.MSPServiceStub(channel)
+            stub = api_pb2_grpc.DriverManagerStub(channel)
             while not check_method():
-                data = method()
-                await stub.StreamData(api_pb2.StreamRequest(action=action, data=data))
-                await asyncio.sleep(0.1)  # Adjust the sleep time as needed
+                status = method()
+                if status is None:
+                    raise ValueError(f"Method {action} returned None")
+                await stub.SendRcDataRPC(api_pb2.RcDataData(
+                    ail=int(self.planner.channels['ail']),
+                    ele=int(self.planner.channels['ele']),
+                    thr=int(self.planner.channels['thr']),
+                    rud=int(self.planner.channels['rud']),
+                    aux_1=int(self.planner.channels['aux1']),
+                    aux_2=int(self.planner.channels['aux2']),
+                    aux_3=int(self.planner.channels['aux3']),
+                    aux_4=int(self.planner.channels['aux4']),
+                ))
+                await asyncio.sleep(0.01)  # Adjust the sleep time as needed
 
 
-def serve():
+async def serve():
     """
     Start the gRPC server to handle navigation commands.
     """
     server = grpc.aio.server()
     api_pb2_grpc.add_NavigationManagerServicer_to_server(NavigationManagerGRPC(), server)
     server.add_insecure_port('[::]:50052')
-    server.start()
-    server.wait_for_termination()
+    await server.start()
+    await server.wait_for_termination()
 
 
 if __name__ == '__main__':
