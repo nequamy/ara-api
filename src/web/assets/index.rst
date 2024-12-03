@@ -6,16 +6,12 @@
 Applied Robotics Avia Wiki documentation
 ========================================
 
-
 .. toctree::
    :maxdepth: 2
-   :caption: Руководство пользователя
+   :caption: Теория
    :hidden:
 
-   user-guide/ARA-EDU/index
-   user-guide/ARA-MINI/index
-   user-guide/ARA-FPV/index
-   user-guide/FS-i6x/index
+   theory/index
 
 .. toctree::
    :maxdepth: 2
@@ -23,22 +19,6 @@ Applied Robotics Avia Wiki documentation
    :hidden:
 
    programming/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Теория
-   :hidden:
-
-   theory/basic/index
-   theory/intermediate/index
-   theory/advanced/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Лабораторные работы
-   :hidden:
-
-   lab-examples/index
 
 Indices and tables
 ==================

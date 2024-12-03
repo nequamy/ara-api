@@ -26,6 +26,6 @@ sphinx_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 if not os.path.exists(sphinx_directory):
     raise FileNotFoundError(f"Directory {sphinx_directory} not found")
 
-if __name__ == '__main__':
+def main():
     app = SphinxFlaskApp('Sphinx Documentation App', sphinx_directory)
-    app.run(True)
+    app.run(debug=False)
