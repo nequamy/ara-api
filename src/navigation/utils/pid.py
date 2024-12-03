@@ -1,3 +1,4 @@
+from datetime import datetime
 import time
 import logging
 import os
@@ -52,7 +53,7 @@ class PID(object):
         self.name = name
         self.__init_logging__()
 
-    def __init_logging__(self, log_directory='log'):
+    def __init_logging__(self, log_directory='log/pids'):
         """
         Initializes the logging for the PID controller.
 
@@ -62,10 +63,13 @@ class PID(object):
         if not os.path.exists(log_directory):
             os.makedirs(log_directory)
 
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file_name = f"{self.name}_pid_works_{timestamp}.log"
+
         self.logger = logging.getLogger(self.name)
         self.logger.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(message)s')
-        handler = logging.FileHandler(os.path.join(log_directory, f'{self.name}_pid_works.log'))
+        handler = logging.FileHandler(os.path.join(log_directory, log_file_name))
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
 
