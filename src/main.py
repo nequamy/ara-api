@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import logging
+import asyncio
 from contextlib import redirect_stdout, redirect_stderr
 
 from gui.app_gui import GUI
@@ -75,7 +76,7 @@ class ServiceManager:
         """
         try:
             self.logger.info("Starting Navigation service")
-            nav_serve()
+            asyncio.run(nav_serve())
         except Exception as e:
             self.logger.error("Error starting Navigation service: %s", e)
 
@@ -94,7 +95,7 @@ class ServiceManager:
         Starts all the services as separate processes.
         """
         self.processes = [
-            multiprocessing.Process(target=self.run_dash_app, name="DASH"),
+            # multiprocessing.Process(target=self.run_dash_app, name="DASH"), # TODO: дореализовать запуск веб-приложения
             multiprocessing.Process(target=self.run_sphinx_app, name="SPHINX"),
             multiprocessing.Process(target=self.run_nav_service, name="NAV"),
             multiprocessing.Process(target=self.run_msp_service, name="MSP")
@@ -138,7 +139,11 @@ class ServiceManager:
                 self.logger.error("Error terminating process %s: %s", process.name, e)
         self.logger.info("All processes terminated.")
 
-if __name__ == '__main__':
+
+def main():
     manager = ServiceManager()
     manager.start_services()
     manager.monitor_services()
+
+if __name__ == "__main__":
+    main()
