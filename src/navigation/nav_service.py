@@ -40,6 +40,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
         """
         self.state |= NavigationManagerGRPC.NavigationFlags['takeoff']
 
+        self.planner.set_target_alt(request.altitude)
         await self.msg_to_msp_service(
             action='TakeOFF',
             method=self.planner.takeoff,
@@ -64,7 +65,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
         await self.msg_to_msp_service(
             action='Land',
             method=self.planner.land,
-            check_method=self.planner.check_desired_altitude
+            check_method=lambda: self.planner.check_desired_altitude(0)
         )
 
         return api_pb2.StatusData(status="OK")
@@ -82,10 +83,15 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
         """
         self.state |= NavigationManagerGRPC.NavigationFlags['move']
 
-        self.planner.set_point_to_move(request.x, request.y, request.z)
+        if request.point is None:
+            context.set_details("Point is not set in the request")
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return api_pb2.StatusData(status="FAILED")
+
+        self.planner.set_point_to_move(request.point.x, request.point.y, request.point.z)
         await self.msg_to_msp_service(
             action='Move',
-            method=lambda: self.planner.move(),
+            method=self.planner.move,
             check_method=self.planner.check_desired_position
         )
 
@@ -107,7 +113,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
         await self.msg_to_msp_service(
             action='SetVelocity',
             method=lambda: self.planner.set_velocity(request.vx, request.vy, request.vz),
-            check_method=self.planner.check_desired_position
+            check_method=self.planner.check_desired_speed()
         )
 
         return api_pb2.StatusData(status="OK")
@@ -142,18 +148,18 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             stub = api_pb2_grpc.DriverManagerStub(channel)
             while not check_method():
                 status = method()
-                if status is None:
-                    raise ValueError(f"Method {action} returned None")
+
                 await stub.SendRcDataRPC(api_pb2.RcDataData(
                     ail=int(self.planner.channels['ail']),
                     ele=int(self.planner.channels['ele']),
                     thr=int(self.planner.channels['thr']),
-                    rud=int(self.planner.channels['rud']),
+                    rud=int(1500), # TODO: add adjusting yaw
                     aux_1=int(self.planner.channels['aux1']),
                     aux_2=int(self.planner.channels['aux2']),
                     aux_3=int(self.planner.channels['aux3']),
                     aux_4=int(self.planner.channels['aux4']),
                 ))
+
                 await asyncio.sleep(0.01)  # Adjust the sleep time as needed
 
 
