@@ -182,8 +182,8 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 request.aux_3,
                 request.aux_4,
             ]
-            print(self.rc_send)
-            # self.msp_controller.msp_send_rc_cmd(self.rc_send)
+
+            self.msp_controller.msp_send_rc_cmd(self.rc_send)
             response = api_pb2.StatusData(
                 status="RC data send"
             )
