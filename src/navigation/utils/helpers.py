@@ -1,3 +1,5 @@
+import logging
+import os
 from math import sin, cos, e
 import numpy as np
 import grpc
@@ -62,42 +64,119 @@ def remap(x, min_old, max_old, min_new, max_new):
     return (x - min_old) * (max_new - min_new) / (max_old - min_old) + min_new
 
 
+# Ensure the log directory exists
+log_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'log')
+os.makedirs(log_dir, exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    filename=os.path.join(log_dir, 'nav_data_fetcher.log'),
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 class DataFetcher:
     def __init__(self, address='localhost:50051'):
         self.channel = grpc.insecure_channel(address)
         self.stub = api_pb2_grpc.DriverManagerStub(self.channel)
+        logging.info(f"DataFetcher initialized with address: {address}")
 
     def get_imu_data(self):
-        response = self.stub.GetImuDataRPC(api_pb2.GetRequest(req=''))
-        for data in response:
-            return data
+        try:
+            logging.info("Fetching IMU data")
+            request = api_pb2.GetRequest(req='')
+            if request is None:
+                logging.error("Request object is None")
+                return None
+            response = self.stub.GetImuDataRPC(request)
+            logging.info("IMU data fetched successfully")
+            return {
+                'gyro': (response.gyro.x, response.gyro.y, response.gyro.z),
+                'accel': (response.acc.x, response.acc.y, response.acc.z),
+            }
+        except grpc.RpcError as e:
+            logging.error(f"gRPC call failed: {e}")
+            return None
 
     def get_sonar_data(self):
-        response = self.stub.GetSonarDataRPC(api_pb2.GetRequest(req=''))
-        for data in response:
-            return data
+        try:
+            logging.info("Fetching Sonar data")
+            request = api_pb2.GetRequest(req='')
+            if request is None:
+                logging.error("Request object is None")
+                return None
+            response = self.stub.GetSonarDataRPC(request)
+            logging.info("Sonar data fetched successfully")
+            return {
+                'distance': response.sonar
+            }
+        except grpc.RpcError as e:
+            logging.error(f"gRPC call failed: {e}")
+            return None
 
     def get_attitude_data(self):
-        response = self.stub.GetAttitudeDataRPC(api_pb2.GetRequest(req=''))
-
-        return {
-            'orientation':      (response.orient.x, response.orient.y, response.orient.z),
-        }
+        try:
+            logging.info("Fetching Attitude data")
+            request = api_pb2.GetRequest(req='')
+            if request is None:
+                logging.error("Request object is None")
+                return None
+            response = self.stub.GetAttitudeDataRPC(request)
+            logging.info("Attitude data fetched successfully")
+            return {
+                'orientation': (response.orient.x, response.orient.y, response.orient.z),
+            }
+        except grpc.RpcError as e:
+            logging.error(f"gRPC call failed: {e}")
+            return None
 
     def get_odometry_data(self):
-        response = self.stub.GetOdometryDataRPC(api_pb2.GetRequest(req=''))
-
-        return {
-            'position':         (response.pos.x, response.pos.y, response.pos.z),
-            'velocity':         (response.vel.x, response.vel.y, response.vel.z)
-        }
+        try:
+            logging.info("Fetching Odometry data")
+            request = api_pb2.GetRequest(req='')
+            if request is None:
+                logging.error("Request object is None")
+                return None
+            response = self.stub.GetOdometryDataRPC(request)
+            logging.info("Odometry data fetched successfully")
+            return {
+                'position': (response.pos.x, response.pos.y, response.pos.z),
+                'velocity': (response.vel.x, response.vel.y, response.vel.z)
+            }
+        except grpc.RpcError as e:
+            logging.error(f"gRPC call failed: {e}")
+            return None
 
     def get_optical_flow_data(self):
-        response = self.stub.GetOpticalFlowDataRPC(api_pb2.GetRequest(req=''))
-        for data in response:
-            return data
+        try:
+            logging.info("Fetching Optical Flow data")
+            request = api_pb2.GetRequest(req='')
+            if request is None:
+                logging.error("Request object is None")
+                return None
+            response = self.stub.GetOpticalFlowDataRPC(request)
+            logging.info("Optical Flow data fetched successfully")
+            return {
+                'quality': response.quality,
+                'flow_rate_x': response.flow_rate_x,
+                'flow_rate_y': response.flow_rate_y,
+                'body_rate_x': response.body_rate_x,
+                'body_rate_y': response.body_rate_y,
+            }
+        except grpc.RpcError as e:
+            logging.error(f"gRPC call failed: {e}")
+            return None
 
     def get_flags_data(self):
-        response = self.stub.GetFlagsDataRPC(api_pb2.GetRequest(req=''))
-        for data in response:
-            return data
+        try:
+            logging.info("Fetching Flags data")
+            request = api_pb2.GetRequest(req='')
+            if request is None:
+                logging.error("Request object is None")
+                return None
+            response = self.stub.GetFlagsDataRPC(request)
+            logging.info("Flags data fetched successfully")
+            return response
+        except grpc.RpcError as e:
+            logging.error(f"gRPC call failed: {e}")
+            return None
