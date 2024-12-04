@@ -15,7 +15,7 @@ import logging
 
 from navigation.planners.nav_planner import NavPlanner
 from navigation.utils.pid import PID
-from navigation.utils.nav_drone_config import Drone
+from navigation.utils.nav_drone_config import Drone, ARA_mini
 from navigation.utils.helpers import exponential_ramp, remap, constrain, transform_multirotor_speed, DataFetcher
 
 
@@ -57,59 +57,72 @@ class NavigationMultirotorPlanner(NavPlanner):
         self.grpc_driver = DataFetcher()
 
         self.target = {
-            'x': 0.0,
-            'y': 0.0,
-            'z': 0.0,
-            'yaw': 0.0,
+            'x':                0.0,
+            'y':                0.0,
+            'z':                0.0,
+            'yaw':              0.0,
         }
 
         self.channels = {
-            'ail': 1500.0,
-            'ele': 1500.0,
-            'thr': 1000.0,
-            'rud': 1500.0,
-            'aux1': 1000.0,
-            'aux2': 1000.0,
-            'aux3': 1000.0,
-            'aux4': 1000.0,
+            'ail':              1500.0,
+            'ele':              1500.0,
+            'thr':              1000.0,
+            'rud':              1500.0,
+            'aux1':             1000.0,
+            'aux2':             1000.0,
+            'aux3':             1000.0,
+            'aux4':             1000.0,
         }
 
         self.odometry = {
-            'position': (0.0, 0.0, 0.0),
-            'orientation': (0.0, 0.0, 0.0),
-            'velocity': (0.0, 0.0, 0.0),
+            'position':         [0.0, 0.0, 0.0],
+            'orientation':      [0.0, 0.0, 0.0],
+            'velocity':         [0.0, 0.0, 0.0],
+        }
+
+        self.grpc_odom = {
+            'position':         [0,0,0],
+            'velocity':         [0,0,0],
+        }
+        self.grpc_att = {
+            'orientation':      [0,0,0],
         }
 
         self.imu = {
-            'gyroscope': (0.0, 0.0, 0.0),
-            'accelerometer': (0.0, 0.0, 0.0),
+            'gyroscope':        [0.0, 0.0, 0.0],
+            'accelerometer':    [0.0, 0.0, 0.0],
         }
 
         self.altitude = {
-            'sonar': 0.0,
-            'barometer': 0.0,
+            'sonar':            0.0,
+            'barometer':        0.0,
         }
 
         self.optical_flow = {
-            'quality': 0.0,
-            'flow_rate_x': 0.0,
-            'flow_rate_y': 0.0,
-            'body_rate_x': 0.0,
-            'body_rate_y': 0.0,
+            'quality':          0.0,
+            'flow_rate_x':      0.0,
+            'flow_rate_y':      0.0,
+            'body_rate_x':      0.0,
+            'body_rate_y':      0.0,
         }
 
         self.flags = {
-            'activeSensors': 0,
+            'activeSensors':    0,
             'armingDisableFlags': 0,
-            'mode': 0,
+            'mode':             0,
         }
 
-        self.upper_threshold = 2000
-        self.lower_threshold = 1000
-        self.approx_koeff = 0.2
-        self.alt_expo = [0]
+        self.upper_threshold =  2000
+        self.lower_threshold =  1000
 
-        self.time_delay = 0.1
+        self.approx_koeff =     0.2
+        self.alt_expo =         [0]
+
+        self.itterator =        0
+        self.itterator_takeoff = False
+        self.itterator_land    = False
+
+        self.time_delay =       0.1
 
     def __init_logging__(self, log_directory='log'):
         if not os.path.exists(log_directory):
@@ -129,8 +142,14 @@ class NavigationMultirotorPlanner(NavPlanner):
         Returns:
             bool: True if takeoff is successful, False otherwise.
         """
-        self.alt_expo = exponential_ramp(self.remap(self.target['z']))
-        self.logger.info(self.channels)
+        if not self.itterator_takeoff:
+            self.logger.warning("Start TakeOFF")
+            self.itterator = 0
+            self.itterator_takeoff = True
+            self.alt_expo = exponential_ramp(self.remap(self.target['z']))
+
+        self.logger.info(self.channels['thr'])
+
         return self.throttle_loop()
 
     def land(self):
@@ -140,19 +159,26 @@ class NavigationMultirotorPlanner(NavPlanner):
         Returns:
             bool: True if landing is successful, False otherwise.
         """
-        self.alt_expo = exponential_ramp(self.channels['thr'])[::-1]
+        if not self.itterator_land:
+            self.logger.warning("Start Landing")
+            self.itterator = 0
+            self.itterator_land = True
+            self.alt_expo = exponential_ramp(self.channels['thr'])[::-1]
+
+        self.logger.info(self.channels['thr'])
 
         return self.throttle_loop()
 
     def throttle_loop(self):
-        i = 0
         try:
             time.sleep(self.time_delay)
-            self.channels['throttle'] = int(self.alt_expo[i])
-            if (i + 1) >= len(self.alt_expo):
+            self.channels['thr'] = int(self.alt_expo[self.itterator])
+            if (self.itterator + 1) >= len(self.alt_expo):
+                self.itterator_takeoff = False
+                self.itterator_land = False
                 return True
             else:
-                i += 1
+                self.itterator += 1
         except Exception as err:
             self.logger.error(f'Throttle loop error: {err}')
             return False
@@ -172,6 +198,10 @@ class NavigationMultirotorPlanner(NavPlanner):
         self.target['z'] = z
         self.logger.info(f'Set point to move: x={x}, y={y}, z={z}')
 
+    def set_target_alt(self, alt):
+        self.target['z'] = alt
+        self.logger.info(f"Set alt to takeoff/land: alt={self.target['z']}")
+
     def move(self):
         """
         Moves the drone towards the target position using PID controllers.
@@ -180,14 +210,20 @@ class NavigationMultirotorPlanner(NavPlanner):
         if self.target['z'] == 0.0 and self.target['x'] == 0.0 and self.target['y'] == 0.0:
             return False
 
-        grpc_odom = self.grpc_driver.get_odometry_data()
-        grpc_att = self.grpc_driver.get_attitude_data()
+        self.grpc_odom = self.grpc_driver.get_odometry_data()
+        self.grpc_att = self.grpc_driver.get_attitude_data()
 
-        self.odometry['position'] = grpc_odom['position']
-        self.odometry['velocity'] = grpc_odom['velocity']
-        self.odometry['orientation'] = grpc_att['orientation']
+        self.odometry['position'][0] = self.grpc_odom['position'][0]
+        self.odometry['position'][1] = self.grpc_odom['position'][1]
+        self.odometry['position'][2] = self.grpc_odom['position'][2]
 
-        print(self.odometry)
+        self.odometry['velocity'][0] = self.grpc_odom['velocity'][0]
+        self.odometry['velocity'][1] = self.grpc_odom['velocity'][1]
+        self.odometry['velocity'][2] = self.grpc_odom['velocity'][2]
+
+        self.odometry['orientation'][0] = self.grpc_att['orientation'][0]
+        self.odometry['orientation'][1] = self.grpc_att['orientation'][1]
+        self.odometry['orientation'][2] = self.grpc_att['orientation'][2]
 
         pitch_computed = self.pitch_pid.compute_classic(
             setpoint=self.target['x'],
@@ -238,7 +274,8 @@ class NavigationMultirotorPlanner(NavPlanner):
         """
         self.channels['ail'] = 1500 + int(self.remap_by_max_min(vx, -2, 2, -300, 300))
         self.channels['ele'] = 1500 + int(self.remap_by_max_min(vy, -2, 2, -300, 300))
-        self.channels['rud'] = 1500 + int(self.remap_by_max_min(vz, -2, 2, -300, 300))
+        # self.channels['rud'] = 1500 + int(self.remap_by_max_min(vz, -2, 2, -300, 300))
+        self.channels['rud'] = 1500
         self.logger.info(f'Set velocity: vx={vx}, vy={vy}, vz={vz}')
 
     def check_desired_altitude(self, alt: int = None) -> bool:
@@ -279,15 +316,17 @@ class NavigationMultirotorPlanner(NavPlanner):
         else:
             return False
 
+    def check_desired_speed(self):
+        return False
+
     def remap(self, x):
         return (x - self.drone.min_altitude) * (self.upper_threshold - self.lower_threshold) / (
                 self.drone.max_altitude - self.drone.min_altitude) + self.lower_threshold
 
 
 if __name__ == "__main__":
-    drone = Drone()
+    drone = ARA_mini()
     planner = NavigationMultirotorPlanner(drone)
     while True:
-        planner.set_point_to_move(1, 0, 0)
-        planner.move()
-        print(planner.channels)
+        planner.set_target_alt(1.5)
+        planner.land()
