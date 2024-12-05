@@ -1,0 +1,53 @@
+[tool.poetry]
+name = "ara-api"
+version = "0.8.0"
+description = "Applied Robotics Avia API for ARA MINI, ARA EDU and ARA FPV drones"
+authors = ["Alexander Kleimenov <nequamy@gmail.com>"]
+license = "No"
+readme = "README.md"
+
+packages = [
+    { include = "driver", from = "src/"},
+    { include = "navigation", from = "src/"},
+    { include = "protos", from = "src/"},
+    { include = "stream", from = "src/"},
+    { include = "web", from = "src/"},
+    { include = "gui", from = "src/"},
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+grpcio = "^1.66.2"
+grpcio-tools = "^1.66.2"
+numpy = "^2.1.1"
+pyserial = "^3.5"
+colorama = "^0.4.6"
+pyfiglet = "^1.0.2"
+opencv-python = "^4.10.0.84"
+opencv-contrib-python = "^4.10.0.84"
+pytest = "^8.3.3"
+dash = "^2.18.2"
+dash-bootstrap-components = "^1.6.0"
+sphinx = "^8.1.3"
+sphinx-copybutton = "^0.5.2"
+sphinx-tabs = "^3.4.7"
+sphinx-rtd-theme = "^3.0.1"
+sphinxcontrib-mermaid = "^1.0.0"
+myst-parser = "^4.0.0"
+dash-dangerously-set-inner-html = "^0.0.2"
+plotly = "^5.24.1"
+pandas = "^2.2.3"
+dash-mantine-components = "^0.14.7"
+dash-leaflet = "^1.0.15"
+dash-iconify = "^0.1.2"
+
+[tool.poetry.scripts]
+api = "src.main:main"
+docs = "src.web.docs_app:main"
+example_circle_by_speed = "example.move_by_speed(circle):main"
+example_square_by_speed = "example.move_by_speed(square):main"
+example_square_by_point = "example.move_by_point(square):main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
