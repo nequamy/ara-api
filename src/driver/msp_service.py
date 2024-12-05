@@ -50,20 +50,19 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
 
     def update_data(self):
         while True:
-            try:
-                self.msp_controller.msp_read_imu_data()
-                self.msp_controller.msp_read_sonar_data()
-                self.msp_controller.msp_read_attitude_data()
-                # self.msp_controller.msp_read_analog_data()
-                self.msp_controller.msp_read_odom_data()
-                # self.msp_controller.msp_read_flags_data()
-                # self.msp_controller.msp_read_optical_flow_data()
-                self.data_logging.info(self.msp_controller.SENSOR_DATA)
-                self.msp_controller.msp_send_rc_cmd(self.rc_send)
-                time.sleep(0.05)
-            except Exception as e:
-                print(e)
-                self.data_logging.error(e)
+            self.msp_controller.msp_read_imu_data()
+            self.msp_controller.msp_read_sonar_data()
+            self.msp_controller.msp_read_attitude_data()
+            self.msp_controller.msp_read_analog_data()
+            self.msp_controller.msp_read_odom_data()
+            self.msp_controller.msp_read_flags_data()
+            self.msp_controller.msp_read_optical_flow_data()
+            # self.data_logging.info(self.msp_controller.SENSOR_DATA)
+            self.msp_controller.msp_send_rc_cmd(self.rc_send)
+            print(self.msp_controller.SENSOR_DATA)
+            print("\n")
+            print(self.rc_send)
+            time.sleep(0.005)
 
     async def GetImuDataRPC(self, request, context):
         self.state_logging.info(f'[IMU]: Request from: {context.peer() }')
@@ -87,7 +86,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             data = api_pb2.SonarData(
                 sonar=self.msp_controller.SENSOR_DATA["sonar"],
             )
-            time.sleep(0.05)
+            time.sleep(0.005)
             return data
         except Exception as e:
             self.state_logging.error("[SONAR]: " + str(e))
@@ -101,7 +100,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 rssi=self.msp_controller.ANALOG['rssi'],
                 amperage=self.msp_controller.ANALOG['amperage'],
             )
-            time.sleep(0.05)
+            time.sleep(0.005)
             return data
         except Exception as e:
             self.state_logging.error("[ANALOG]: " + str(e))
@@ -116,7 +115,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                     z=self.msp_controller.SENSOR_DATA['kinematics'][2],
                 ),
             )
-            time.sleep(0.05)
+            time.sleep(0.005)
             return data
         except Exception as e:
             self.state_logging.error("[ATTITUDE]: " + str(e))
@@ -137,7 +136,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 ),
                 yaw=self.msp_controller.SENSOR_DATA['odom']['yaw'],
             )
-            time.sleep(0.05)
+            time.sleep(0.005)
             return data
         except Exception as e:
             self.state_logging.error("[ODOM]: " + str(e))
@@ -152,7 +151,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 body_rate_x=self.msp_controller.SENSOR_DATA["optical_flow"][3],
                 body_rate_y=self.msp_controller.SENSOR_DATA["optical_flow"][4],
             )
-            time.sleep(0.05)
+            time.sleep(0.005)
             return data
         except Exception as e:
             self.state_logging.error("[OPTFLOW]: " + str(e))
@@ -165,7 +164,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 armingDisableFlags=self.msp_controller.CONFIG['armingDisableFlags'],
                 mode=self.msp_controller.CONFIG['mode'],
             )
-            time.sleep(0.05)
+            time.sleep(0.005)
             return data
         except Exception as e:
             self.state_logging.error("[FLAGS]: " + str(e))
@@ -187,6 +186,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             response = api_pb2.StatusData(
                 status="RC data send"
             )
+            time.sleep(0.005)
             return response
         except Exception as e:
             self.state_logging.error("[RCIN]: " + str(e))
@@ -202,6 +202,7 @@ async def serve(manager):
 
 def main(*args, **kwargs):
     msp_service = MSPDriverManagerGRPC()
+    # msp_service.update_data()
     update_thread = Thread(target=msp_service.update_data, args=(), daemon=True)
 
     update_thread.start()
