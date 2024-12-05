@@ -1,3 +1,9 @@
+"""
+This module provides the MSPDriverManagerGRPC class which implements the gRPC server for managing the multirotor control system.
+
+Classes:
+    MSPDriverManagerGRPC: Implements the gRPC server for managing the multirotor control system.
+"""
 import grpc
 import time
 import os
@@ -13,7 +19,26 @@ from protos.api_pb2_grpc import add_DriverManagerServicer_to_server
 logging.basicConfig(level=logging.INFO, filename='ara_api_msp_service.log', filemode='w')
 
 class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
+    """
+    Implements the gRPC server for managing the multirotor control system.
+
+    Methods:
+        __init__: Initializes the MSPDriverManagerGRPC class.
+        __init_logging__: Initializes logging for the MSPDriverManagerGRPC class.
+        update_data: Continuously updates sensor data from the multirotor controller.
+        GetImuDataRPC: Handles gRPC requests for IMU data.
+        GetSonarDataRPC: Handles gRPC requests for sonar data.
+        GetAnalogDataRPC: Handles gRPC requests for analog data.
+        GetAttitudeDataRPC: Handles gRPC requests for attitude data.
+        GetOdometryDataRPC: Handles gRPC requests for odometry data.
+        GetOpticalFlowDataRPC: Handles gRPC requests for optical flow data.
+        GetFlagsDataRPC: Handles gRPC requests for flags data.
+        SendRcDataRPC: Handles gRPC requests to send RC data.
+    """
     def __init__(self):
+        """
+        Initializes the MSPDriverManagerGRPC class, sets up logging, and connects to the multirotor controller.
+        """
         self.__init_logging__('log')
 
         # TODO: разобраться почему не работает UDPTransmitter
@@ -24,6 +49,12 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
         self.rc_send = self.rc_get = [1500, 1500, 1000, 1500, 1000, 1000, 1000, 1000]
 
     def __init_logging__(self, log_directory='log'):
+        """
+        Initializes logging for the MSPDriverManagerGRPC class.
+
+        Args:
+            log_directory (str): The directory where log files will be stored.
+        """
         if not os.path.exists(log_directory):
             os.makedirs(log_directory)
 
@@ -49,22 +80,35 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
         self.driver_logging.addHandler(self.driver_handler)
 
     def update_data(self):
+        """
+        Continuously updates sensor data from the multirotor controller.
+        """
         while True:
-            self.msp_controller.msp_read_imu_data()
-            self.msp_controller.msp_read_sonar_data()
-            self.msp_controller.msp_read_attitude_data()
-            self.msp_controller.msp_read_analog_data()
-            self.msp_controller.msp_read_odom_data()
-            self.msp_controller.msp_read_flags_data()
-            self.msp_controller.msp_read_optical_flow_data()
-            # self.data_logging.info(self.msp_controller.SENSOR_DATA)
-            self.msp_controller.msp_send_rc_cmd(self.rc_send)
-            print(self.msp_controller.SENSOR_DATA)
-            print("\n")
-            print(self.rc_send)
-            time.sleep(0.005)
+            try:
+                self.msp_controller.msp_read_imu_data()
+                self.msp_controller.msp_read_sonar_data()
+                self.msp_controller.msp_read_attitude_data()
+                self.msp_controller.msp_read_analog_data()
+                self.msp_controller.msp_read_odom_data()
+                self.msp_controller.msp_read_flags_data()
+                self.msp_controller.msp_read_optical_flow_data()
+                self.data_logging.info(self.msp_controller.SENSOR_DATA)
+                self.msp_controller.msp_send_rc_cmd(self.rc_send)
+                time.sleep(0.01)
+            except Exception as e:
+                self.state_logging.error("[UPDATE_DATA]: " + str(e))
 
     async def GetImuDataRPC(self, request, context):
+        """
+        Handles gRPC requests for sonar data.
+
+        Args:
+            request: The gRPC request object.
+            context: The gRPC context object.
+
+        Returns:
+            api_pb2.SonarData: The sonar data.
+        """
         self.state_logging.info(f'[IMU]: Request from: {context.peer() }')
         try:
             data = api_pb2.IMUData(
@@ -81,6 +125,16 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             self.state_logging.error("[IMU]: "+ str(e))
 
     async def GetSonarDataRPC(self, request, context):
+        """
+        Handles gRPC requests for sonar data.
+
+        Args:
+            request: The gRPC request object.
+            context: The gRPC context object.
+
+        Returns:
+            api_pb2.SonarData: The sonar data.
+        """
         self.state_logging.info(f'[SONAR]: Request from: {context.peer() }')
         try:
             data = api_pb2.SonarData(
@@ -92,6 +146,16 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             self.state_logging.error("[SONAR]: " + str(e))
 
     async def GetAnalogDataRPC(self, request, context):
+        """
+        Handles gRPC requests for analog data.
+
+        Args:
+            request: The gRPC request object.
+            context: The gRPC context object.
+
+        Returns:
+            api_pb2.AnalogData: The analog data.
+        """
         self.state_logging.info(f'[ANALOG]: Request from: {context.peer() }')
         try:
             data = api_pb2.AnalogData(
@@ -106,6 +170,16 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             self.state_logging.error("[ANALOG]: " + str(e))
 
     async def GetAttitudeDataRPC(self, request, context):
+        """
+        Handles gRPC requests for attitude data.
+
+        Args:
+            request: The gRPC request object.
+            context: The gRPC context object.
+
+        Returns:
+            api_pb2.AttitudeData: The attitude data.
+        """
         self.state_logging.info(f'[ATTITUDE]: Request from: {context.peer() }')
         try:
             data = api_pb2.AttitudeData(
@@ -121,6 +195,16 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             self.state_logging.error("[ATTITUDE]: " + str(e))
 
     async def GetOdometryDataRPC(self, request, context):
+        """
+        Handles gRPC requests for odometry data.
+
+        Args:
+            request: The gRPC request object.
+            context: The gRPC context object.
+
+        Returns:
+            api_pb2.OdometryData: The odometry data.
+        """
         self.state_logging.info(f'[ODOM]: Request from: {context.peer() }')
         try:
             data = api_pb2.OdometryData(
@@ -142,6 +226,16 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             self.state_logging.error("[ODOM]: " + str(e))
 
     async def GetOpticalFlowDataRPC(self, request, context):
+        """
+        Handles gRPC requests for odometry data.
+
+        Args:
+            request: The gRPC request object.
+            context: The gRPC context object.
+
+        Returns:
+            api_pb2.OdometryData: The odometry data.
+        """
         self.state_logging.info(f'[OPTFLOW]: Request from: {context.peer() }')
         try:
             data = api_pb2.OpticalFlowData(
@@ -157,6 +251,16 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             self.state_logging.error("[OPTFLOW]: " + str(e))
 
     async def GetFlagsDataRPC(self, request, context):
+        """
+        Handles gRPC requests for flags data.
+
+        Args:
+            request: The gRPC request object.
+            context: The gRPC context object.
+
+        Returns:
+            api_pb2.FlagsData: The flags data.
+        """
         self.state_logging.info(f'[FLAGS]: Request from: {context.peer() }')
         try:
             data = api_pb2.FlagsData(
@@ -170,6 +274,16 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             self.state_logging.error("[FLAGS]: " + str(e))
 
     async def SendRcDataRPC(self, request, context):
+        """
+        Handles gRPC requests to send RC data.
+
+        Args:
+            request: The gRPC request object.
+            context: The gRPC context object.
+
+        Returns:
+            api_pb2.StatusData: The status of the RC data send operation.
+        """
         self.state_logging.info(f'[RCIN]: Request from: {context.peer() }')
         try:
             self.rc_send = [
@@ -192,6 +306,12 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             self.state_logging.error("[RCIN]: " + str(e))
 
 async def serve(manager):
+    """
+    Starts the gRPC server and adds the DriverManagerServicer to it.
+
+    Args:
+        manager: The DriverManagerServicer instance.
+    """
     server = grpc.aio.server()
     add_DriverManagerServicer_to_server(manager, server)
     listen_addr = "[::]:50051"
@@ -201,6 +321,9 @@ async def serve(manager):
     await server.wait_for_termination()
 
 def main(*args, **kwargs):
+    """
+    The main entry point for the MSPDriverManagerGRPC service.
+    """
     msp_service = MSPDriverManagerGRPC()
     # msp_service.update_data()
     update_thread = Thread(target=msp_service.update_data, args=(), daemon=True)

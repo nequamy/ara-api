@@ -216,8 +216,6 @@ class NavigationMultirotorPlanner(NavPlanner):
         self.grpc_odom = self.grpc_driver.get_odometry_data()
         self.grpc_att = self.grpc_driver.get_attitude_data()
 
-        print(self.grpc_odom)
-
         if not self.odometry_zero_flag:
             self.odometry_zero['position'][0] = self.grpc_odom['position'][0]
             self.odometry_zero['position'][1] = self.grpc_odom['position'][1]
@@ -236,9 +234,6 @@ class NavigationMultirotorPlanner(NavPlanner):
         self.odometry['orientation'][0] = radians(self.grpc_att['orientation'][0] - self.odometry_zero['orientation'][0])
         self.odometry['orientation'][1] = radians(self.grpc_att['orientation'][1])
         self.odometry['orientation'][2] = radians(self.grpc_att['orientation'][2])
-
-        # print(f"Odometry: {self.odometry}")
-        # print(f"Odometry zero: {self.odometry_zero}")
 
         pitch_computed = self.pitch_pid.compute_classic(
             setpoint=self.target['x'],

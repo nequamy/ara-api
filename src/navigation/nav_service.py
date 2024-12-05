@@ -41,6 +41,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
         self.state |= NavigationManagerGRPC.NavigationFlags['takeoff']
 
         self.planner.set_target_alt(request.altitude)
+        print(f"Takeoff {request.altitude}")
         await self.msg_to_msp_service(
             action='TakeOFF',
             method=self.planner.takeoff,
@@ -62,6 +63,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
         """
         self.state |= NavigationManagerGRPC.NavigationFlags['land']
 
+        print("Land")
         await self.msg_to_msp_service(
             action='Land',
             method=self.planner.land,
@@ -88,6 +90,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return api_pb2.StatusData(status="FAILED")
 
+        print(f"Move to {request.point.x}, {request.point.y}")
         self.planner.set_point_to_move(request.point.x, request.point.y, request.point.z)
         await self.msg_to_msp_service(
             action='Move',
