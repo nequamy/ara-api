@@ -12,6 +12,7 @@ Classes:
 import time
 import os
 import logging
+from math import radians
 
 from navigation.planners.nav_planner import NavPlanner
 from navigation.utils.pid import PID
@@ -74,7 +75,7 @@ class NavigationMultirotorPlanner(NavPlanner):
             'aux4':             1000.0,
         }
 
-        self.odometry = {
+        self.odometry = self.odometry_zero = {
             'position':         [0.0, 0.0, 0.0],
             'orientation':      [0.0, 0.0, 0.0],
             'velocity':         [0.0, 0.0, 0.0],
@@ -121,6 +122,8 @@ class NavigationMultirotorPlanner(NavPlanner):
         self.itterator =        0
         self.itterator_takeoff = False
         self.itterator_land    = False
+
+        self.odometry_zero_flag = False
 
         self.time_delay =       0.1
 
@@ -213,17 +216,29 @@ class NavigationMultirotorPlanner(NavPlanner):
         self.grpc_odom = self.grpc_driver.get_odometry_data()
         self.grpc_att = self.grpc_driver.get_attitude_data()
 
-        self.odometry['position'][0] = self.grpc_odom['position'][0]
-        self.odometry['position'][1] = self.grpc_odom['position'][1]
-        self.odometry['position'][2] = self.grpc_odom['position'][2]
+        print(self.grpc_odom)
+
+        if not self.odometry_zero_flag:
+            self.odometry_zero['position'][0] = self.grpc_odom['position'][0]
+            self.odometry_zero['position'][1] = self.grpc_odom['position'][1]
+            self.odometry_zero['position'][2] = self.grpc_odom['position'][2]
+            self.odometry_zero['orientation'][0] = self.grpc_att['orientation'][0]
+            self.odometry_zero_flag = True
+
+        self.odometry['position'][0] = self.grpc_odom['position'][0] - self.odometry_zero['position'][0]
+        self.odometry['position'][1] = self.grpc_odom['position'][1] - self.odometry_zero['position'][1]
+        self.odometry['position'][2] = self.grpc_odom['position'][2] - self.odometry_zero['position'][2]
 
         self.odometry['velocity'][0] = self.grpc_odom['velocity'][0]
         self.odometry['velocity'][1] = self.grpc_odom['velocity'][1]
         self.odometry['velocity'][2] = self.grpc_odom['velocity'][2]
 
-        self.odometry['orientation'][0] = self.grpc_att['orientation'][0]
-        self.odometry['orientation'][1] = self.grpc_att['orientation'][1]
-        self.odometry['orientation'][2] = self.grpc_att['orientation'][2]
+        self.odometry['orientation'][0] = radians(self.grpc_att['orientation'][0] - self.odometry_zero['orientation'][0])
+        self.odometry['orientation'][1] = radians(self.grpc_att['orientation'][1])
+        self.odometry['orientation'][2] = radians(self.grpc_att['orientation'][2])
+
+        # print(f"Odometry: {self.odometry}")
+        # print(f"Odometry zero: {self.odometry_zero}")
 
         pitch_computed = self.pitch_pid.compute_classic(
             setpoint=self.target['x'],
@@ -310,6 +325,7 @@ class NavigationMultirotorPlanner(NavPlanner):
         if (self.target['x'] - 0.12) < self.odometry['position'][0] < (self.target['x'] + 0.12):
             if self.target['y'] - 0.12 < self.odometry['position'][1] < self.target['y'] + 0.12:
                 self.logger.info('Check desired position: Reached')
+                self.odometry_zero = False
                 return True
             else:
                 return False
@@ -329,4 +345,5 @@ if __name__ == "__main__":
     planner = NavigationMultirotorPlanner(drone)
     while True:
         planner.set_target_alt(1.5)
-        planner.land()
+        planner.set_point_to_move(1,0,0)
+        planner.move()

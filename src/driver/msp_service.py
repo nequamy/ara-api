@@ -13,7 +13,7 @@ from protos.api_pb2_grpc import add_DriverManagerServicer_to_server
 logging.basicConfig(level=logging.INFO, filename='ara_api_msp_service.log', filemode='w')
 
 class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
-    def __init__(self, address: tuple, type: str):
+    def __init__(self):
         self.__init_logging__('log')
 
         # TODO: разобраться почему не работает UDPTransmitter
@@ -54,14 +54,15 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 self.msp_controller.msp_read_imu_data()
                 self.msp_controller.msp_read_sonar_data()
                 self.msp_controller.msp_read_attitude_data()
-                self.msp_controller.msp_read_analog_data()
+                # self.msp_controller.msp_read_analog_data()
                 self.msp_controller.msp_read_odom_data()
-                self.msp_controller.msp_read_flags_data()
-                self.msp_controller.msp_read_optical_flow_data()
+                # self.msp_controller.msp_read_flags_data()
+                # self.msp_controller.msp_read_optical_flow_data()
                 self.data_logging.info(self.msp_controller.SENSOR_DATA)
-                # print(self.msp_controller.SENSOR_DATA)
+                self.msp_controller.msp_send_rc_cmd(self.rc_send)
                 time.sleep(0.05)
             except Exception as e:
+                print(e)
                 self.data_logging.error(e)
 
     async def GetImuDataRPC(self, request, context):
@@ -183,7 +184,6 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 request.aux_4,
             ]
 
-            self.msp_controller.msp_send_rc_cmd(self.rc_send)
             response = api_pb2.StatusData(
                 status="RC data send"
             )
@@ -201,7 +201,7 @@ async def serve(manager):
     await server.wait_for_termination()
 
 def main(*args, **kwargs):
-    msp_service = MSPDriverManagerGRPC(("192.168.2.113", 14550), "udp")
+    msp_service = MSPDriverManagerGRPC()
     update_thread = Thread(target=msp_service.update_data, args=(), daemon=True)
 
     update_thread.start()

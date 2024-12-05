@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 
-
 class Stream(object):
     def __init__(self, mode: str = None):
         self.cap = None
