@@ -149,22 +149,24 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
         """
         async with grpc.aio.insecure_channel('localhost:50051') as channel:
             stub = api_pb2_grpc.DriverManagerStub(channel)
-            while not check_method():
-                status = method()
+            try:
+                while not check_method():
+                    status = method()
 
-                await stub.SendRcDataRPC(api_pb2.RcDataData(
-                    ail=int(self.planner.channels['ail']),
-                    ele=int(self.planner.channels['ele']),
-                    thr=int(self.planner.channels['thr']),
-                    rud=int(1500), # TODO: add adjusting yaw
-                    aux_1=int(self.planner.channels['aux1']),
-                    aux_2=int(self.planner.channels['aux2']),
-                    aux_3=int(self.planner.channels['aux3']),
-                    aux_4=int(self.planner.channels['aux4']),
-                ))
+                    await stub.SendRcDataRPC(api_pb2.RcDataData(
+                        ail=int(self.planner.channels['ail']),
+                        ele=int(self.planner.channels['ele']),
+                        thr=int(self.planner.channels['thr']),
+                        rud=int(1500), # TODO: add adjusting yaw
+                        aux_1=int(self.planner.channels['aux1']),
+                        aux_2=int(self.planner.channels['aux2']),
+                        aux_3=int(self.planner.channels['aux3']),
+                        aux_4=int(self.planner.channels['aux4']),
+                    ))
 
                 await asyncio.sleep(0.01)  # Adjust the sleep time as needed
-
+            except Exception as e:
+                print("bag")
 
 async def serve():
     """

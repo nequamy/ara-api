@@ -12,13 +12,13 @@ def main():
     api.takeoff(1.5)
     time.sleep(3)
 
-    api.move_by_point(1, 0)
+    api.move_by_point(0.5, 0)
     time.sleep(3)
-    api.move_by_point(0, 1)
+    api.move_by_point(0.5, 0.5)
     time.sleep(3)
-    api.move_by_point(-1, 0)
+    api.move_by_point(0, 0.5)
     time.sleep(3)
-    api.move_by_point(0, -1)
+    api.move_by_point(0, 0)
     time.sleep(3)
 
     api.land()
