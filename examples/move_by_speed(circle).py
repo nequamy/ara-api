@@ -2,7 +2,6 @@ from lib.AppliedRoboticsAviaAPI import AppliedRoboticsAviaAPI
 import time
 import math
 
-# TODO: написать рабочий пример
 
 def main():
     api = AppliedRoboticsAviaAPI()

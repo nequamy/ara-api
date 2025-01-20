@@ -2,7 +2,6 @@ from lib.AppliedRoboticsAviaAPI import AppliedRoboticsAviaAPI
 import time
 import asyncio
 
-# TODO: написать рабочий пример
 
 def main():
     api = AppliedRoboticsAviaAPI()

@@ -75,14 +75,14 @@ class AppliedRoboticsAviaAPI:
         """
         Calls the set_speed service from NavigationManagerGRPC
         """
-        print(f"Set velocity as ({vx}, {vy})", end="")
+        print(f"Set velocity as ({vy}, {vx})", end="")
         
         for i in range(self.attemps):
             try:
                 request = api_pb2.VelocityData(
                     velocity=api_pb2.Vector3(
-                        x=vx,
-                        y=vy,
+                        x=vy,
+                        y=vx,
                         z=0, # not available now (TODO)
                     )
                 )
@@ -91,7 +91,7 @@ class AppliedRoboticsAviaAPI:
                 return response.status
             except Exception as e:
                 print(".", end="")
-    
+        
     def reset_velocity_state(self):
         print("Resetting state", end="")
         

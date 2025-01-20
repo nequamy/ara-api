@@ -35,3 +35,5 @@ class Stream(object):
     def get_id(self):
         return self.ids
 
+stream = Stream()
+stream.stream()

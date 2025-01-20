@@ -325,8 +325,8 @@ class NavigationMultirotorPlanner(NavPlanner):
         Returns:
             bool: True if the desired position is reached, False otherwise.
         """
-        if (self.target['x'] - 0.12) < self.odometry['position'][0] < (self.target['x'] + 0.12):
-            if self.target['y'] - 0.12 < self.odometry['position'][1] < self.target['y'] + 0.12:
+        if (self.target['x'] - 0.15) < self.odometry['position'][0] < (self.target['x'] + 0.15):
+            if self.target['y'] - 0.15 < self.odometry['position'][1] < self.target['y'] + 0.15:
                 self.logger.info('Check desired position: Reached')
                 self.odometry_zero = False
                 return True

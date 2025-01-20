@@ -57,6 +57,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             self.msp_controller.msp_read_attitude_data()
             self.msp_controller.msp_read_odom_data()
             self.msp_controller.msp_send_rc_cmd(self.rc_send)
+            print(self.msp_controller.SENSOR_DATA)
             print(self.rc_send)
             print("\n")
             time.sleep(1/50)
