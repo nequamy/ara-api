@@ -5,7 +5,7 @@ import asyncio
 from threading import Thread
 import logging
 from driver.msp_controller import MultirotorControl
-from driver.msp_transmitter import serialize, UDPTransmitter, TCPTransmitter
+from driver.msp_transmitter import serialize, UDPTransmitter, TCPTransmitter, SerialTransmitter
 import protos.api_pb2 as api_pb2
 import protos.api_pb2_grpc as api_pb2_grpc
 from protos.api_pb2_grpc import add_DriverManagerServicer_to_server
@@ -22,6 +22,8 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
         self.msp_controller.connect()
 
         self.rc_send = self.rc_get = [1500, 1500, 1000, 1500, 1000, 1000, 1000, 1000]
+        
+        self.start_time = time.time()
 
     def __init_logging__(self, log_directory='log'):
         if not os.path.exists(log_directory):
@@ -50,19 +52,14 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
 
     def update_data(self):
         while True:
+            
             self.msp_controller.msp_read_imu_data()
-            self.msp_controller.msp_read_sonar_data()
             self.msp_controller.msp_read_attitude_data()
-            self.msp_controller.msp_read_analog_data()
             self.msp_controller.msp_read_odom_data()
-            self.msp_controller.msp_read_flags_data()
-            self.msp_controller.msp_read_optical_flow_data()
-            # self.data_logging.info(self.msp_controller.SENSOR_DATA)
             self.msp_controller.msp_send_rc_cmd(self.rc_send)
-            print(self.msp_controller.SENSOR_DATA)
-            print("\n")
             print(self.rc_send)
-            time.sleep(0.005)
+            print("\n")
+            time.sleep(1/50)
 
     async def GetImuDataRPC(self, request, context):
         self.state_logging.info(f'[IMU]: Request from: {context.peer() }')
@@ -86,7 +83,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
             data = api_pb2.SonarData(
                 sonar=self.msp_controller.SENSOR_DATA["sonar"],
             )
-            time.sleep(0.005)
+            time.sleep(0.01)
             return data
         except Exception as e:
             self.state_logging.error("[SONAR]: " + str(e))
@@ -100,7 +97,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 rssi=self.msp_controller.ANALOG['rssi'],
                 amperage=self.msp_controller.ANALOG['amperage'],
             )
-            time.sleep(0.005)
+            time.sleep(0.01)
             return data
         except Exception as e:
             self.state_logging.error("[ANALOG]: " + str(e))
@@ -115,7 +112,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                     z=self.msp_controller.SENSOR_DATA['kinematics'][2],
                 ),
             )
-            time.sleep(0.005)
+            time.sleep(0.01)
             return data
         except Exception as e:
             self.state_logging.error("[ATTITUDE]: " + str(e))
@@ -128,15 +125,9 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                     x=self.msp_controller.SENSOR_DATA['odom']['position'][0],
                     y=self.msp_controller.SENSOR_DATA['odom']['position'][1],
                     z=self.msp_controller.SENSOR_DATA['odom']['position'][2],
-                ),
-                vel=api_pb2.Vector3(
-                    x=self.msp_controller.SENSOR_DATA['odom']['velocity'][0],
-                    y=self.msp_controller.SENSOR_DATA['odom']['velocity'][1],
-                    z=self.msp_controller.SENSOR_DATA['odom']['velocity'][2],
-                ),
-                yaw=self.msp_controller.SENSOR_DATA['odom']['yaw'],
+                )
             )
-            time.sleep(0.005)
+            time.sleep(0.01)
             return data
         except Exception as e:
             self.state_logging.error("[ODOM]: " + str(e))
@@ -151,7 +142,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 body_rate_x=self.msp_controller.SENSOR_DATA["optical_flow"][3],
                 body_rate_y=self.msp_controller.SENSOR_DATA["optical_flow"][4],
             )
-            time.sleep(0.005)
+            time.sleep(0.01)
             return data
         except Exception as e:
             self.state_logging.error("[OPTFLOW]: " + str(e))
@@ -164,7 +155,7 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 armingDisableFlags=self.msp_controller.CONFIG['armingDisableFlags'],
                 mode=self.msp_controller.CONFIG['mode'],
             )
-            time.sleep(0.005)
+            time.sleep(0.01)
             return data
         except Exception as e:
             self.state_logging.error("[FLAGS]: " + str(e))
@@ -182,11 +173,12 @@ class MSPDriverManagerGRPC(api_pb2_grpc.DriverManagerServicer):
                 request.aux_3,
                 request.aux_4,
             ]
-
+            
             response = api_pb2.StatusData(
                 status="RC data send"
             )
-            time.sleep(0.005)
+            
+            time.sleep(0.01)
             return response
         except Exception as e:
             self.state_logging.error("[RCIN]: " + str(e))
@@ -202,7 +194,6 @@ async def serve(manager):
 
 def main(*args, **kwargs):
     msp_service = MSPDriverManagerGRPC()
-    # msp_service.update_data()
     update_thread = Thread(target=msp_service.update_data, args=(), daemon=True)
 
     update_thread.start()
