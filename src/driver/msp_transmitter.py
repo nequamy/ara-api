@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from threading import Lock, Thread
 import logging
 import socket
-import zmq
 import serial
 
 
