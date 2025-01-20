@@ -26,7 +26,6 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
         """
         self.planner = NavigationMultirotorPlanner(ARA_mini)
         self.state = 0
-        self._use_kalman = True
 
     async def TakeOFF(self, request, context):
         """
@@ -83,6 +82,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             api_pb2.StatusData: The response indicating success.
         """
         self.state |= NavigationManagerGRPC.NavigationFlags['move']
+
         if request.point is None:
             context.set_details("Point is not set in the request")
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -94,6 +94,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             method=self.planner.move,
             check_method=self.planner.check_desired_position
         )
+
         return api_pb2.StatusData(status="OK")
 
     async def SetVelocity(self, request, context):

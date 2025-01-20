@@ -222,6 +222,7 @@ class NavigationMultirotorPlanner(NavPlanner):
         """
         Moves the drone towards the target position using PID controllers.
         """
+
         if self.target['z'] == 0.0 and self.target['x'] == 0.0 and self.target['y'] == 0.0:
             return False
 
@@ -262,7 +263,7 @@ class NavigationMultirotorPlanner(NavPlanner):
             max_val=2
         )
 
-        self.channels['ail'], self.channels['ele'], self.channels['rud'] = transform_multirotor_speed_o1(
+        self.channels['ail'], self.channels['ele'], self.channels['rud'] = transform_multirotor_speed_second(
             roll=self.odometry['orientation'][0],
             pitch=self.odometry['orientation'][1],
             yaw=self.odometry['orientation'][2],
