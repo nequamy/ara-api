@@ -44,6 +44,28 @@ def transform_multirotor_speed(roll, pitch, yaw, speed_roll, speed_pitch, speed_
             constrain(v_local[1], -2, 2), # pitch velocity
             constrain(v_local[2], -2, 2)) # yaw velocity
 
+
+def transform_multirotor_speed_second(roll, pitch, yaw, speed_roll, speed_pitch, speed_yaw):
+    from math import sin, cos
+    cφ = cos(roll)
+    sφ = sin(roll)
+    cθ = cos(pitch)
+    sθ = sin(pitch)
+    cψ = cos(-yaw)
+    sψ = sin(-yaw)
+
+    u = speed_roll
+    v = speed_pitch
+    w = speed_yaw
+
+    # Уравнения для преобразования в локальной системе
+    u_prime = cψ * cθ * u + (cψ * sθ * sφ - sψ * cφ) * v + (cψ * sθ * cφ + sψ * sφ) * w
+    v_prime = sψ * cθ * u + (sψ * sθ * sφ + cψ * cφ) * v + (sψ * sθ * cφ - cψ * sφ) * w
+    w_prime = -sθ * u + cθ * sφ * v + cθ * cφ * w
+
+    return (u_prime, v_prime, w_prime)
+
+
 def exponential_ramp(target_value: float = 0, lower_threshold:int = 1000, upper_threshold:int = 2000):
     target_value = min(target_value, upper_threshold)
 
@@ -140,8 +162,7 @@ class DataFetcher:
             response = self.stub.GetOdometryDataRPC(request)
             logging.info("Odometry data fetched successfully")
             return {
-                'position': (response.pos.x, response.pos.y, response.pos.z),
-                'velocity': (response.vel.x, response.vel.y, response.vel.z)
+                'position': (response.pos.x, response.pos.y, response.pos.z)
             }
         except grpc.RpcError as e:
             logging.error(f"gRPC call failed: {e}")

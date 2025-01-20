@@ -26,6 +26,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
         """
         self.planner = NavigationMultirotorPlanner(ARA_mini)
         self.state = 0
+        self._use_kalman = True
 
     async def TakeOFF(self, request, context):
         """
@@ -82,7 +83,6 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             api_pb2.StatusData: The response indicating success.
         """
         self.state |= NavigationManagerGRPC.NavigationFlags['move']
-
         if request.point is None:
             context.set_details("Point is not set in the request")
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -94,7 +94,6 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             method=self.planner.move,
             check_method=self.planner.check_desired_position
         )
-
         return api_pb2.StatusData(status="OK")
 
     async def SetVelocity(self, request, context):
@@ -109,13 +108,19 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
             api_pb2.StatusData: The response indicating success.
         """
         self.state |= NavigationManagerGRPC.NavigationFlags['set_velocity']
-
-        await self.msg_to_msp_service(
-            action='SetVelocity',
-            method=lambda: self.planner.set_velocity(request.vx, request.vy, request.vz),
-            check_method=self.planner.check_desired_speed()
-        )
-
+        
+        if ((request.velocity.x <= 3) and (request.velocity.x >= -3)) and ((request.velocity.y <= 3) and (request.velocity.y >= -3)):
+            self.planner.set_target_speed(request.velocity.x, request.velocity.y)
+            await self.msg_to_msp_service(
+                action='SetVelocity',
+                method=self.planner.set_velocity,
+                check_method=self.planner.check_desired_speed
+            )
+        else:
+            self.channels['ail'] = 1500
+            self.channels['ele'] = 1500
+            return api_pb2.StatusData(status="ERROR")
+        
         return api_pb2.StatusData(status="OK")
 
     async def SetSettings(self, request, context):
@@ -160,7 +165,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
                     aux_4=int(self.planner.channels['aux4']),
                 ))
 
-                await asyncio.sleep(0.01)  # Adjust the sleep time as needed
+                await asyncio.sleep(0.01) 
 
 
 async def serve():
