@@ -169,7 +169,7 @@ class NavigationManagerGRPC(api_pb2_grpc.NavigationManagerServicer):
                         aux_3=int(self.planner.channels['aux3']),
                         aux_4=int(self.planner.channels['aux4']),
                     ))
-
+            except Exception as e:
                 await asyncio.sleep(0.01) 
 
 async def serve():
