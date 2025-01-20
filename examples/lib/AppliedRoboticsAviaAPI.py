@@ -3,7 +3,6 @@ import grpc
 import protos.api_pb2 as api_pb2
 from protos.api_pb2_grpc import DriverManagerStub, NavigationManagerStub
 
-# TODO: написать рабочую библиотеку для управления дроном с помощью RPC
 
 class AppliedRoboticsAviaAPI:
     """
@@ -16,6 +15,8 @@ class AppliedRoboticsAviaAPI:
         """
         self.nav_channel = grpc.insecure_channel(nav_address)
         self.driver_channel = grpc.insecure_channel(driver_address)
+        
+        self.attemps = 5
 
         self.nav_stub = NavigationManagerStub(self.nav_channel)
         self.driver_stub = DriverManagerStub(self.driver_channel)
@@ -24,47 +25,92 @@ class AppliedRoboticsAviaAPI:
         """
         Calls the takeoff service from NavigationManagerGRPC
         """
-        request = api_pb2.AltitudeSetData(altitude=altitude)
-        response = self.nav_stub.TakeOFF(request)
-        return response.status
-
+        print(f"TakeOFF on {altitude}", end="")
+        
+        for i in range(self.attemps):
+            try:
+                request = api_pb2.AltitudeSetData(altitude=altitude)
+                response = self.nav_stub.TakeOFF(request)
+                
+                return response.status
+            except Exception as e:
+                print(".", end="")
+            
     def land(self):
         """
         Calls the land service from NavigationManagerGRPC
         """
-        request = api_pb2.AltitudeSetData(altitude=0)
-        response = self.nav_stub.Land(request)
-        return response.status
-
+        print("Landing", end="")
+        for i in range(self.attemps):
+            try:
+                request = api_pb2.AltitudeSetData(altitude=0)
+                response = self.nav_stub.Land(request)
+                
+                return response.status
+            except Exception as e:
+                print(".", end="")
+            
     def move_by_point(self, x, y):
         """
         Calls the move service from NavigationManagerGRPC
         """
-        request = api_pb2.PointData(
-            point=api_pb2.Vector3(
-                x=x,
-                y=y,
-                z=0, # not available now (TODO)
-            )
-        )
-        response = self.nav_stub.Move(request)
-        return response.status
-
+        print(f"Move to ({x}, {y})", end="")
+        
+        for i in range(self.attemps):
+            try:
+                request = api_pb2.PointData(
+                    point=api_pb2.Vector3(
+                        x=x,
+                        y=y,
+                        z=0, # not available now (TODO)
+                    )
+                )
+                response = self.nav_stub.Move(request)
+                
+                return response.status
+            except Exception as e:
+                print(".", end="")
 
     def set_velocity(self, vx, vy):
         """
         Calls the set_speed service from NavigationManagerGRPC
         """
-        request = api_pb2.VelocityData(
-            velocity=api_pb2.Vector3(
-                x=vx,
-                y=vy,
-                z=0, # not available now (TODO)
-            )
-        )
-        response = self.nav_stub.SetVelocity(request)
-        return response.status
-
+        print(f"Set velocity as ({vx}, {vy})", end="")
+        
+        for i in range(self.attemps):
+            try:
+                request = api_pb2.VelocityData(
+                    velocity=api_pb2.Vector3(
+                        x=vx,
+                        y=vy,
+                        z=0, # not available now (TODO)
+                    )
+                )
+                response = self.nav_stub.SetVelocity(request)
+                
+                return response.status
+            except Exception as e:
+                print(".", end="")
+    
+    def reset_velocity_state(self):
+        print("Resetting state", end="")
+        
+        for i in range(self.attemps):
+            try:
+                request = api_pb2.VelocityData(
+                    velocity=api_pb2.Vector3(
+                        x=0,
+                        y=0,
+                        z=0,
+                    )
+                )
+                response = self.nav_stub.SetVelocity(request)
+                
+                return response.status
+            except Exception as e:
+                print(".", end="")
+        
+    
     def get_imu_data(self):
         response = self.driver_stub.GetImuDataRPC(api_pb2.GetRequest(req=''))
         return {
@@ -90,7 +136,6 @@ class AppliedRoboticsAviaAPI:
 
         return {
             'position':         (response.pos.x, response.pos.y, response.pos.z),
-            'velocity':         (response.vel.x, response.vel.y, response.vel.z)
         }
 
     def get_optical_flow_data(self):
