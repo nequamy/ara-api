@@ -17,7 +17,7 @@ from math import radians
 from navigation.planners.nav_planner import NavPlanner
 from navigation.utils.pid import PID
 from navigation.utils.nav_drone_config import Drone, ARA_mini
-from navigation.utils.helpers import exponential_ramp, remap, constrain, transform_multirotor_speed, DataFetcher
+from navigation.utils.helpers import exponential_ramp, remap, constrain, transform_multirotor_speed, transform_multirotor_speed_second, DataFetcher
 
 
 class NavigationMultirotorPlanner(NavPlanner):
@@ -50,9 +50,9 @@ class NavigationMultirotorPlanner(NavPlanner):
          """
         self.__init_logging__('log')
 
-        self.roll_pid = PID(kp=2.5, kd=1.5, name="roll")
-        self.pitch_pid = PID(kp=2.5, kd=1.5, name="pitch")
-        self.yaw_pid = PID(kp=2.5, kd=1.5, name="yaw")
+        self.roll_pid = PID(kp=2, kd=1, name="roll")
+        self.pitch_pid = PID(kp=2, kd=1, name="pitch")
+        self.yaw_pid = PID(kp=2, kd=1, name="yaw")
 
         self.drone = drone
         self.grpc_driver = DataFetcher()
@@ -62,6 +62,12 @@ class NavigationMultirotorPlanner(NavPlanner):
             'y':                0.0,
             'z':                0.0,
             'yaw':              0.0,
+        }
+        
+        self.target_speed = {
+            'x':                0.0,
+            'y':                0.0,
+            'z':                0.0,
         }
 
         self.channels = {
@@ -204,6 +210,13 @@ class NavigationMultirotorPlanner(NavPlanner):
     def set_target_alt(self, alt):
         self.target['z'] = alt
         self.logger.info(f"Set alt to takeoff/land: alt={self.target['z']}")
+        
+    def set_target_speed(self, vx: float = 0, vy: float = 0, vz: float = 0):
+        self.target_speed['x'] = 1500 + int(remap(vx, -3, 3, -500, 500))
+        self.target_speed['y'] = 1500 + int(remap(vy, -3, 3, -500, 500))
+        self.target_speed['z'] = 1500
+        
+        self.logger.info(f"Set target speed to vx={vx}, vy={vy}, vz={vz}")
 
     def move(self):
         """
@@ -227,10 +240,6 @@ class NavigationMultirotorPlanner(NavPlanner):
         self.odometry['position'][1] = self.grpc_odom['position'][1] - self.odometry_zero['position'][1]
         self.odometry['position'][2] = self.grpc_odom['position'][2] - self.odometry_zero['position'][2]
 
-        self.odometry['velocity'][0] = self.grpc_odom['velocity'][0]
-        self.odometry['velocity'][1] = self.grpc_odom['velocity'][1]
-        self.odometry['velocity'][2] = self.grpc_odom['velocity'][2]
-
         self.odometry['orientation'][0] = radians(self.grpc_att['orientation'][0] - self.odometry_zero['orientation'][0])
         self.odometry['orientation'][1] = radians(self.grpc_att['orientation'][1])
         self.odometry['orientation'][2] = radians(self.grpc_att['orientation'][2])
@@ -247,14 +256,14 @@ class NavigationMultirotorPlanner(NavPlanner):
 
         yaw_computed = constrain(
             self.yaw_pid.compute_classic(
-                setpoint=self.target['yaw'],
+                setpoint=0,
                 value=self.odometry['orientation'][2]
             ),
             min_val=-2,
             max_val=2
         )
 
-        self.channels['ail'], self.channels['ele'], self.channels['rud'] = transform_multirotor_speed(
+        self.channels['ail'], self.channels['ele'], self.channels['rud'] = transform_multirotor_speed_second(
             roll=self.odometry['orientation'][0],
             pitch=self.odometry['orientation'][1],
             yaw=self.odometry['orientation'][2],
@@ -262,10 +271,10 @@ class NavigationMultirotorPlanner(NavPlanner):
             speed_pitch=pitch_computed,
             speed_yaw=yaw_computed
         )
-
-        self.channels['ail'] = 1500 + int(remap(self.channels['ail'], -2, 2, -300, 300))
-        self.channels['ele'] = 1500 + int(remap(self.channels['ele'], -2, 2, -300, 300))
-        self.channels['rud'] = 1500 + int(remap(self.channels['rud'], -2, 2, -300, 300))
+        
+        self.channels['ail'] = 1500 + int(remap(self.channels['ail'], -3, 3, -300, 300))
+        self.channels['ele'] = 1500 + int(remap(self.channels['ele'], -3, 3, -300, 300))
+        self.channels['rud'] = 1500
 
         self.logger.info(
             f'Move: Roll={self.channels["ail"]}, '
@@ -273,7 +282,7 @@ class NavigationMultirotorPlanner(NavPlanner):
             f'Yaw={self.channels["rud"]}'
         )
 
-    def set_velocity(self, vx: float, vy: float, vz: float):
+    def set_velocity(self):
         """
         Sets the velocity for the drone.
 
@@ -281,12 +290,11 @@ class NavigationMultirotorPlanner(NavPlanner):
             vx (float): Velocity in the x-direction.
             vy (float): Velocity in the y-direction.
             vz (float): Velocity in the z-direction.
-        """
-        self.channels['ail'] = 1500 + int(self.remap_by_max_min(vx, -2, 2, -300, 300))
-        self.channels['ele'] = 1500 + int(self.remap_by_max_min(vy, -2, 2, -300, 300))
-        # self.channels['rud'] = 1500 + int(self.remap_by_max_min(vz, -2, 2, -300, 300))
-        self.channels['rud'] = 1500
-        self.logger.info(f'Set velocity: vx={vx}, vy={vy}, vz={vz}')
+        """        
+        
+        self.channels['ail'] = self.target_speed['x']
+        self.channels['ele'] = self.target_speed['y']
+        self.channels['rud'] = self.target_speed['z']
 
     def check_desired_altitude(self, alt: int = None) -> bool:
         """
@@ -317,8 +325,8 @@ class NavigationMultirotorPlanner(NavPlanner):
         Returns:
             bool: True if the desired position is reached, False otherwise.
         """
-        if (self.target['x'] - 0.12) < self.odometry['position'][0] < (self.target['x'] + 0.12):
-            if self.target['y'] - 0.12 < self.odometry['position'][1] < self.target['y'] + 0.12:
+        if (self.target['x'] - 0.15) < self.odometry['position'][0] < (self.target['x'] + 0.15):
+            if self.target['y'] - 0.15 < self.odometry['position'][1] < self.target['y'] + 0.15:
                 self.logger.info('Check desired position: Reached')
                 self.odometry_zero = False
                 return True
@@ -328,8 +336,11 @@ class NavigationMultirotorPlanner(NavPlanner):
             return False
 
     def check_desired_speed(self):
-        return False
-
+        if ((self.target_speed['x'] == self.channels['ail']) and (self.target_speed['y'] == self.channels['ele'])):
+            return True
+        else:
+            return False 
+            
     def remap(self, x):
         return (x - self.drone.min_altitude) * (self.upper_threshold - self.lower_threshold) / (
                 self.drone.max_altitude - self.drone.min_altitude) + self.lower_threshold
@@ -342,3 +353,4 @@ if __name__ == "__main__":
         planner.set_target_alt(1.5)
         planner.set_point_to_move(1,0,0)
         planner.move()
+        print(planner.channels)

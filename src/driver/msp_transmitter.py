@@ -1,8 +1,9 @@
 import time
 from abc import ABC, abstractmethod
-from threading import Lock
+from threading import Lock, Thread
 import logging
 import socket
+import zmq
 import serial
 
 
@@ -35,116 +36,123 @@ class Transmitter(ABC):
 class UDPTransmitter(Transmitter):
     def __init__(self, address):
         super().__init__()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.buffersize = 4096  # Default buffer size for UDP
+        self.closed = False
+        self.timeout_exception = socket.timeout
+        self.host, self.port = address
+        self.timeout = None
 
-        self.address = address
-        self.udp_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    def connect(self):
-        if self.is_connect is False:
-            try:
-                self.udp_client.connect(self.address)
-                self.is_connect = True
-
-                logging.info("udp connect")
-                print("udp connect")
-            except:
-                logging.error("cant connect to udp")
-                print("cant connect to udp")
-
-        else:
-            logging.info("udp_client is connected already")
-            print("udp_client is connected already")
+    def connect(self, timeout=1/500):
+        self.sock.settimeout(timeout)
+        self.closed = False
+        self.timeout = timeout
 
     def disconnect(self):
-        if self.is_connect is True:
-            try:
-                self.udp_client.close()
-                self.is_connect = False
+        if not self.sock:
+            raise Exception("Cannot close, socket never created")
+        self.closed = True
+        self.sock.close()
 
-                logging.info("close udp")
-            except:
-                logging.error("cant close udp")
-        else:
-            logging.info("udp_client is disconnected already")
+    def reconnect(self):
+        self.sock.settimeout(self.timeout)
+        self.closed = False
 
     def send(self, bufView: bytearray, blocking: bool = True, timeout: int = -1):
-        # try:
-        res = self.udp_client.send(bufView)
-        logging.info("RAW message sent by udp: {0}".format(bufView))
-        print("RAW message sent by udp: {0}".format(bufView))
-        res = 1
-        # except Exception as e:
-        #     logging.error(e)
-        #     res = 0
-        return res
+        sent = self.sock.sendto(bufView, (self.host, self.port))
+        if not sent:
+            raise RuntimeError("socket connection broken (send)?")
+        return sent
 
-    def receive(self, size: int, timeout: int = 1):
-        # try:
-            msg_header = self.udp_client.recv(1)
-            msg = self.udp_client.recv(size - 1)
-            logging.info("Recived msg_header: {0}; msg: {1}".format(msg_header, msg))
-            print("Recived msg_header: {0}; msg: {1}".format(msg_header, msg))
-            return msg_header, msg
-        # except:
-        #     logging.info("Cant recive msg")
-        #     print("Cant recive msg")
+    def receive(self, size: int):
+        recvbuffer = b''
+        try:
+            if size:
+                recvbuffer, _ = self.sock.recvfrom(size)
+            else:
+                recvbuffer, _ = self.sock.recvfrom(self.buffersize)
+        except socket.timeout:
+            return recvbuffer
+        if not recvbuffer:
+            raise RuntimeError("socket connection broken (recv)?")
 
-    def local_read(self, size):
-        return self.udp_client.recv(size)
+        return recvbuffer
 
-
+    def local_read(self, size=1):
+        return self.sock.recvfrom(size)[0]
+        
+        
 class TCPTransmitter(Transmitter):
     def __init__(self, address):
         super().__init__()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
+        self.buffersize = self.sock.getsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF)
         
-        self.address = address
-        self.tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.closed = False
+        self.timeout_exception = socket.timeout
+        self.host = "192.168.2.113"
+        self.port = 5760
+        self.timeout = None
+        
+    def connect(self, timeout=1/500):
+        self.sock.connect((self.host, self.port))
+        self.sock.settimeout(timeout)
+        self.closed = False
+        self.timeout = timeout
 
-    def connect(self):
-        if self.is_connect is False:
+    def disconnect(self):           
+        if not self.sock:
+            raise Exception("Cannot close, socket never created")
+        self.closed = True
+        self.sock.close()
+        
+    def reconnect(self, attempts=3, delay=1):
+        for attempt in range(attempts):
             try:
-                self.tcp_client.connect(self.address)
-                self.is_connect = True
-                
-                logging.info("tcp connect")
-            except:
-                logging.error("cant connect to tcp")
-        else:
-            logging.info("tcp_client is connected already")
-
-    def disconnect(self):
-        if self.is_connect is True:
-            try:
-                self.tcp_client.clsoe()
-                self.is_connect = False
-                
-                logging.info("close tcp")
-            except:
-                logging.error("cant close tcp")
-        else:
-            logging.info("tcp_client is disconnected already")
+                self.sock.close()
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                self.sock.connect((self.host, self.port))
+                self.sock.settimeout(self.timeout)
+                self.closed = False
+                return
+            except (ConnectionResetError, OSError) as e:
+                if attempt < attempts - 1:
+                    time.sleep(delay)
+                else:
+                    raise e
 
     def send(self, bufView:bytearray, blocking:bool = True, timeout:int = -1):
         try:
-            res = self.tcp_client.send(bufView)
-            logging.info("RAW message sent by tcp: {0}".format(bufView))  
-            res = 1
-        except:
-            logging.error("Cant send bufView to tcp")
-            res = 0
-        return res
+            sent = self.sock.send(bufView)
+            if not sent:
+                raise RuntimeError("socket connection broken (send)?")
+            return sent
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            self.reconnect()
+            sent = self.sock.send(bufView)
+            if not sent:
+                raise RuntimeError("socket connection broken (send)?")
+            return sent
     
-    def receive(self, size:int, timeout:int = 1):
+    def receive(self, size:int):
+        recvbuffer = b''
         try:
-            msg_header  = self.tcp_client.recv(1)
-            msg =  self.tcp_client.recv(size - 1)
-            logging.info("Recived msg_header: {0}; msg: {1}".format(msg_header,msg))
-            return msg_header, msg
-        except:
-            logging.info("Cant recive msg")
+            if size:
+                recvbuffer = self.sock.recv(size)
+            else:
+                recvbuffer = self.sock.recv(self.buffersize)
+        except socket.timeout:
+            return recvbuffer
+        if (not recvbuffer):
+            raise RuntimeError("socket connection broken (recv)?")
+
+        return recvbuffer
     
     def local_read(self, size=1):
-        return self.tcp_client.recv(size)
+        return self.sock.recv(size)
 
 
 class SerialTransmitter(Transmitter):
@@ -231,4 +239,3 @@ def serialize(address, type):
             return TCPTransmitter(address)
         case "serial":
             return SerialTransmitter(address, 115200)
-        

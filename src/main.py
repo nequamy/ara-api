@@ -5,12 +5,22 @@ import time
 import logging
 import asyncio
 from contextlib import redirect_stdout, redirect_stderr
+import platform
 
-from gui.app_gui import GUI
+import colorama
+import pyfiglet
+from colorama import Fore
+
 from navigation.nav_service import NavigationManagerGRPC, serve as nav_serve
-from web.docs_app import SphinxFlaskApp
-from web.app import run
 from driver.msp_service import main as msp_main
+
+
+system = platform.system()
+if system == "Windows":
+    multiprocessing.set_start_method('spawn')
+elif system in ["Linux", "Darwin"]:  # Darwin is macOS
+    multiprocessing.set_start_method('fork')
+
 
 class ServiceManager:
     """
@@ -21,8 +31,16 @@ class ServiceManager:
         """
         Initializes the ServiceManager with necessary configurations.
         """
-        self.gui = GUI()
-        self.gui.run()
+        self.ascii_art = pyfiglet.figlet_format("ARA MINI API v0.8.0", font="slant", width=50)
+        self.summary = ("Поздравляем! Вы запустили API для программирования ARA MINI\n\n"
+                        "Документация запущена на адресе: http://127.0.0.1:5000/\n"
+                        # "WEB-приложение запущено на адресе: http://127.0.0.1:8050/\n\n"
+                        "Для подключения в конфигуратеоре:\n"
+                        "\tUDP: \thttp://192.168.2.113:14550\n"
+                        "\tTCP: \thttp://192.168.2.113:5760\n\n"
+                        "Изображение с камеры: \t\thttp://192.168.2.113:81/stream\n")
+
+        self.gui_run()
 
         self.sphinx_directory = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '../docs/html/')
@@ -43,32 +61,18 @@ class ServiceManager:
         self.logger_handler = logging.FileHandler(os.path.join(log_directory, 'service_manager.log'))
         self.logger_handler.setFormatter(self.logger_formater)
         self.logger.addHandler(self.logger_handler)
+    
+    def gui_run(self):
+        colorama.init()
 
-    def run_dash_app(self):
-        """
-        Runs the Dash application.
-        """
-        self.logger.info("Starting Dash app")
-        try:
-            with open(os.devnull, 'w', encoding='utf-8') as f, \
-                 redirect_stdout(f), redirect_stderr(f):
-                run()
-        except Exception as e:
-            self.logger.error("Error starting Dash app: %s", e)
+        print(Fore.BLUE + self.ascii_art)
+        print("=" * 60)
+        print("\n")
+        print(Fore.CYAN + self.summary)
 
-    def run_sphinx_app(self):
-        """
-        Runs the Sphinx application.
-        """
-        try:
-            self.logger.info("Starting Sphinx app")
-            with open(os.devnull, 'w', encoding='utf-8') as f:
-                sys.stdout = f
-                sys.stderr = f
-                sphinx_flask_app = SphinxFlaskApp('ara api documentation', self.sphinx_directory)
-                sphinx_flask_app.run()
-        except Exception as e:
-            self.logger.error("Error starting Sphinx app: %s", e)
+        # print(Fore.RED + "Data output:")
+        print(Fore.MAGENTA)
+        colorama.deinit()
 
     def run_nav_service(self):
         """
@@ -95,8 +99,6 @@ class ServiceManager:
         Starts all the services as separate processes.
         """
         self.processes = [
-            # multiprocessing.Process(target=self.run_dash_app, name="DASH"), # TODO: дореализовать запуск веб-приложения
-            multiprocessing.Process(target=self.run_sphinx_app, name="SPHINX"),
             multiprocessing.Process(target=self.run_nav_service, name="NAV"),
             multiprocessing.Process(target=self.run_msp_service, name="MSP")
         ]

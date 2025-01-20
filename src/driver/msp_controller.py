@@ -748,15 +748,13 @@ class MultirotorControl:
             _ = self.receive_raw_msg(size=6)
 
     def receive_raw_msg(self, size, timeout=10):
-        msg_header, msg = self.transmitter.receive(size, timeout)
-        return msg_header + msg
+        return self.transmitter.receive(size)
 
     def receive_msg(self):
         dataHandler = self.dataHandler_init.copy()
         received_bytes = self.receive_raw_msg(3)
         dataHandler['last_received_timestamp'] = time.time()
-
-        # local_read = self.conn.read
+        
         local_read = self.transmitter.local_read
         with self.serial_port_read_lock:  # It's necessary to lock everything because order is important
             di = 0
@@ -1232,10 +1230,6 @@ class MultirotorControl:
         self.SENSOR_DATA['odom']['position'][0] = self.readbytes(data, size=32, unsigned=False) / 100_000
         self.SENSOR_DATA['odom']['position'][1] = self.readbytes(data, size=32, unsigned=False) / 100_000
         self.SENSOR_DATA['odom']['position'][2] = self.readbytes(data, size=32, unsigned=False) / 100_000
-        self.SENSOR_DATA['odom']['velocity'][0] = self.readbytes(data, size=32, unsigned=False) / 100_000
-        self.SENSOR_DATA['odom']['velocity'][1] = self.readbytes(data, size=32, unsigned=False) / 100_000
-        self.SENSOR_DATA['odom']['velocity'][2] = self.readbytes(data, size=32, unsigned=False) / 100_000
-        self.SENSOR_DATA['odom']['yaw'] = radians(int(self.readbytes(data, size=32, unsigned=False) / 10))
 
     def process_MSPV2_INAV_ANALOG(self, data):
         if self.INAV:

@@ -95,8 +95,6 @@ message OpticalFlowData {
 
 message OdometryData {
     Vector3 pos = 1;
-    Vector3 vel = 2;
-    float yaw = 3;
 }
 
 message AnalogData {
