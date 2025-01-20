@@ -33,8 +33,6 @@ class ServiceManager:
         """
         self.ascii_art = pyfiglet.figlet_format("ARA MINI API v0.8.0", font="slant", width=50)
         self.summary = ("Поздравляем! Вы запустили API для программирования ARA MINI\n\n"
-                        "Документация запущена на адресе: http://127.0.0.1:5000/\n"
-                        # "WEB-приложение запущено на адресе: http://127.0.0.1:8050/\n\n"
                         "Для подключения в конфигуратеоре:\n"
                         "\tUDP: \thttp://192.168.2.113:14550\n"
                         "\tTCP: \thttp://192.168.2.113:5760\n\n"
