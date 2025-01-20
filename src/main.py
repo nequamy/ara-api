@@ -5,6 +5,7 @@ import time
 import logging
 import asyncio
 from contextlib import redirect_stdout, redirect_stderr
+import platform
 
 import colorama
 import pyfiglet
@@ -12,6 +13,14 @@ from colorama import Fore
 
 from navigation.nav_service import NavigationManagerGRPC, serve as nav_serve
 from driver.msp_service import main as msp_main
+
+
+system = platform.system()
+if system == "Windows":
+    multiprocessing.set_start_method('spawn')
+elif system in ["Linux", "Darwin"]:  # Darwin is macOS
+    multiprocessing.set_start_method('fork')
+
 
 class ServiceManager:
     """
