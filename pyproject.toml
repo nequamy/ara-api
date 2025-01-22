@@ -41,6 +41,8 @@ dash-iconify = "^0.1.2"
 
 [tool.poetry.scripts]
 api = "src.main:main"
+driver = "src.driver.msp_service:main"
+nav = "src.navigation.nav_service:serve"
 example_circle_by_speed = "example.move_by_speed(circle):main"
 example_square_by_speed = "example.move_by_speed(square):main"
 example_square_by_point = "example.move_by_point(square):main"
